@@ -160,10 +160,12 @@ class ResourceService(Service):
                 devnull = os.open(os.devnull, os.O_WRONLY)
                 command = "cms%s" % service.name
                 if not config.installed:
-                    command = os.path.join(
+                    local_command = os.path.join(
                         ".",
                         "scripts",
                         "cms%s" % service.name)
+                    if os.path.exists(local_command):
+                        command = local_command
                 process = subprocess.Popen([command,
                                             "%d" % service.shard,
                                             "-c",
