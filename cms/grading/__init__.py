@@ -36,7 +36,7 @@ from collections import namedtuple
 
 from sqlalchemy.orm import joinedload
 
-from cms import LANG_C, LANG_CPP, LANG_PASCAL, LANG_PYTHON, LANG_PHP, LANG_JAVA
+from cms import LANG_C, LANG_CPP, LANG_PASCAL, LANG_PYTHON, LANG_PYTHON3, LANG_PHP, LANG_JAVA
 from cms.db import Submission
 from cms.grading.Sandbox import Sandbox
 
@@ -124,10 +124,15 @@ def get_compilation_commands(language, source_filenames, executable_filename,
         # In order to use Python 3 change them to:
         # /usr/bin/python3 -m py_compile %s
         # mv __pycache__/%s.*.pyc %s
-        py_command = ["/usr/bin/python2", "-m", "py_compile",
-                      source_filenames[0]]
+        py_command = ["/usr/bin/python2.7", "-m", "py_compile", source_filenames[0]]
         mv_command = ["/bin/mv", "%s.pyc" % os.path.splitext(os.path.basename(
-                      source_filenames[0]))[0], executable_filename]
+                              source_filenames[0]))[0], executable_filename]
+        commands.append(py_command)
+        commands.append(mv_command)
+    elif language == LANG_PYTHON3:
+        py_command = ["/usr/bin/python3.4", "-m", "py_compile", source_filenames[0]]
+        base_name = os.path.splitext(os.path.basename(source_filenames[0]))[0]
+        mv_command = ["/bin/bash", "-c", "/bin/mv __pycache__/%s.*.pyc %s" % (base_name, executable_filename)]
         commands.append(py_command)
         commands.append(mv_command)
     elif language == LANG_PHP:
@@ -163,7 +168,10 @@ def get_evaluation_commands(language, executable_filename):
     elif language == LANG_PYTHON:
         # In order to use Python 3 change it to:
         # /usr/bin/python3 %s
-        command = ["/usr/bin/python2", executable_filename]
+        command = ["/usr/bin/python2.7", executable_filename]
+        commands.append(command)
+    elif language == LANG_PYTHON3:
+        command = ["/usr/bin/python3.4", executable_filename]
         commands.append(command)
     elif language == LANG_PHP:
         command = ["/usr/bin/php5", executable_filename]
@@ -239,7 +247,9 @@ def compilation_step(sandbox, commands):
             logger.error("Compilation aborted because of "
                          "sandbox error in `%s'.", sandbox.path)
             return False, None, None, None
-
+        exit_status = sandbox.get_exit_status()
+        if exit_status != sandbox.EXIT_OK:
+            break
     # Detect the outcome of the compilation.
     exit_status = sandbox.get_exit_status()
     exit_code = sandbox.get_exit_code()
