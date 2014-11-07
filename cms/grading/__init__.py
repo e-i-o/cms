@@ -140,15 +140,16 @@ def get_compilation_commands(language, source_filenames, executable_filename,
         commands.append(command)
     elif language == LANG_JAVA:
         class_name = os.path.splitext(source_filenames[0])[0]
-        command = ["/usr/bin/gcj", "--main=%s" % class_name, "-O3", "-o",
-                   executable_filename] + source_filenames
-        commands.append(command)
+        javac_command = ["/usr/local/jdk1.8.0_20/bin/javac"] + source_filenames
+        jar_command = ["/bin/bash", "-c", "/usr/local/jdk1.8.0_20/bin/jar cfe %s.jar %s *.class" % (class_name, class_name)]
+        mv_command = ["/bin/mv", "%s.jar" % class_name, class_name]
+        commands += [javac_command, jar_command, mv_command]
     else:
         raise ValueError("Unknown language %s." % language)
     return commands
 
 
-def get_evaluation_commands(language, executable_filename):
+def get_evaluation_commands(language, executable_filename, job=None):
     """Return the evaluation commands.
 
     The evaluation commands are for the given language and executable
@@ -162,7 +163,7 @@ def get_evaluation_commands(language, executable_filename):
 
     """
     commands = []
-    if language in (LANG_C, LANG_CPP, LANG_PASCAL, LANG_JAVA):
+    if language in (LANG_C, LANG_CPP, LANG_PASCAL):
         command = [os.path.join(".", executable_filename)]
         commands.append(command)
     elif language == LANG_PYTHON:
@@ -175,6 +176,9 @@ def get_evaluation_commands(language, executable_filename):
         commands.append(command)
     elif language == LANG_PHP:
         command = ["/usr/bin/php5", executable_filename]
+        commands.append(command)
+    elif language == LANG_JAVA:
+        command = ["/usr/local/jdk1.8.0_20/bin/java", "-Xmx%dM" % job.memory_limit, "-jar", executable_filename]
         commands.append(command)
     else:
         raise ValueError("Unknown language %s." % language)
@@ -218,7 +222,7 @@ def format_status_text(status, translator=None):
         return translator("N/A")
 
 
-def compilation_step(sandbox, commands):
+def compilation_step(sandbox, commands, language=None):
     """Execute some compilation commands in the sandbox, setting up the
     sandbox itself with a standard configuration and doing standard
     checks at the end of the compilation.
@@ -235,7 +239,8 @@ def compilation_step(sandbox, commands):
     sandbox.max_processes = None
     sandbox.timeout = 10
     sandbox.wallclock_timeout = 20
-    sandbox.address_space = 512 * 1024
+    if language != LANG_JAVA:   # Javac complains when we limit the address space
+        sandbox.address_space = 512 * 1024
     sandbox.stdout_file = "compiler_stdout.txt"
     sandbox.stderr_file = "compiler_stderr.txt"
 

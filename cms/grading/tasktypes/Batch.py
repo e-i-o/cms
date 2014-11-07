@@ -28,6 +28,7 @@ import logging
 
 from cms import LANGUAGES, LANGUAGE_TO_SOURCE_EXT_MAP, \
     LANGUAGE_TO_HEADER_EXT_MAP
+from cms import LANG_JAVA
 from cms.grading import get_compilation_commands, get_evaluation_commands, \
     compilation_step, evaluation_step, human_evaluation_message, \
     is_evaluation_passed, extract_outcome_and_text, white_diff_step
@@ -189,7 +190,7 @@ class Batch(TaskType):
 
         # Run the compilation
         operation_success, compilation_success, text, plus = \
-            compilation_step(sandbox, commands)
+            compilation_step(sandbox, commands, language)
 
         # Retrieve the compiled executables
         job.success = operation_success
@@ -215,7 +216,10 @@ class Batch(TaskType):
         # Prepare the execution
         executable_filename = job.executables.keys()[0]
         language = job.language
-        commands = get_evaluation_commands(language, executable_filename)
+        if job.language == LANG_JAVA: # Somewhy JVM will only work with 9 processes or more
+            sandbox.max_processes = 20
+
+        commands = get_evaluation_commands(language, executable_filename, job)
         executables_to_get = {
             executable_filename:
             job.executables[executable_filename].digest
@@ -244,7 +248,7 @@ class Batch(TaskType):
             sandbox,
             commands,
             job.time_limit,
-            job.memory_limit,
+            job.memory_limit if language != LANG_JAVA else 0,
             stdin_redirect=stdin_redirect,
             stdout_redirect=stdout_redirect)
 
