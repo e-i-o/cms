@@ -223,7 +223,7 @@ class BaseHandler(CommonRequestHandler):
         self.browser_lang = parse_accept_header(
             self.request.headers.get("Accept-Language", ""),
             LanguageAccept).best_match(self.langs, self.langs[0])
-
+        self.browser_lang = 'et'
         self.cookie_lang = self.get_cookie("language", None)
 
         if self.cookie_lang in self.langs:
