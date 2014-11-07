@@ -259,7 +259,7 @@ def build():
         path = os.path.join("cms", "server", "mo", country_code,
                             "LC_MESSAGES")
         makedir(path)
-        os.system("msgfmt %s -o %s" % (locale, os.path.join(path, "cms.mo")))
+        os.system("msgfmt -f %s -o %s" % (locale, os.path.join(path, "cms.mo")))
 
     print("done.")
 
