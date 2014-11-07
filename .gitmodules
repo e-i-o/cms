@@ -1,3 +1,4 @@
 [submodule "isolate"]
 	path = isolate
-	url = https://github.com/cms-dev/isolate.git
+	url = https://github.com/konstantint/isolate.git
+	branch = eio-changes
