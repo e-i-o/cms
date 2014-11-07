@@ -125,6 +125,7 @@ def do_setup():
                     "cmstestsuite.tasks.communication",
                     "cmscompat"],
           package_data=package_data,
+          include_package_data=True,
           scripts=["scripts/cmsLogService",
                    "scripts/cmsScoringService",
                    "scripts/cmsEvaluationService",
@@ -264,6 +265,6 @@ def build():
 
 
 if __name__ == "__main__":
-    do_setup()
     if "build" in sys.argv:
         build()
+    do_setup()

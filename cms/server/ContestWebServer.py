@@ -437,12 +437,7 @@ class ContestWebServer(WebService):
         self.notifications = {}
 
         # Retrieve the available translations.
-        if config.installed:
-            self.localization_dir = os.path.join(
-                "/", "usr", "local", "share", "locale")
-        else:
-            self.localization_dir = os.path.join(
-                os.path.dirname(__file__), "mo")
+        self.localization_dir = pkg_resources.resource_filename('cms.server', 'mo')	
         self.langs = ["en-US"] + [
             path.split("/")[-3].replace("_", "-") for path in glob.glob(
                 os.path.join(self.localization_dir,
