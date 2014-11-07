@@ -797,6 +797,7 @@ class IsolateSandbox(SandboxBase):
         self.chdir = self.inner_temp_dir  # -c
         self.dirs = []                 # -d
         self.dirs += [(self.inner_temp_dir, self.path, "rw")]
+        self.dirs += [("/opt/rh/devtoolset-2/root", None, None)]
         self.preserve_env = False      # -e
         self.inherit_env = []          # -E
         self.set_env = {}              # -E
