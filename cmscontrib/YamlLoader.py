@@ -446,6 +446,7 @@ class YamlLoader(Loader):
 
         load(conf, args, ["time_limit", "timeout"], conv=float)
         load(conf, args, ["memory_limit", "memlimit"])
+        load(conf, args, "score_type")
 
         # Builds the parameters that depend on the task type
         args["managers"] = []
@@ -556,7 +557,7 @@ class YamlLoader(Loader):
                 # Close last subtask (if no subtasks were defined, just
                 # fallback to Sum)
                 if points is None:
-                    args["score_type"] = "Sum"
+                    assert args["score_type"] == "Sum"
                     total_value = float(conf.get("total_value", 100.0))
                     input_value = 0.0
                     n_input = testcases
@@ -565,9 +566,9 @@ class YamlLoader(Loader):
                     args["score_type_parameters"] = "%s" % input_value
                 else:
                     subtasks.append([points, testcases])
-                    assert(100 == sum([int(st[0]) for st in subtasks]))
+                    #assert(100 == sum([int(st[0]) for st in subtasks]))
                     n_input = sum([int(st[1]) for st in subtasks])
-                    args["score_type"] = "GroupMin"
+                    assert args["score_type"] in ["GroupMin", "GroupMul", "GroupSum"]
                     args["score_type_parameters"] = "%s" % subtasks
 
                 if "n_input" in conf:
@@ -575,7 +576,7 @@ class YamlLoader(Loader):
 
         # If gen/GEN doesn't exist, just fallback to Sum
         except IOError:
-            args["score_type"] = "Sum"
+            assert args["score_type"] == "Sum"
             total_value = float(conf.get("total_value", 100.0))
             input_value = 0.0
             n_input = int(conf['n_input'])
