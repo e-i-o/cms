@@ -61,9 +61,11 @@ LANG_PYTHON = "py"
 LANG_PYTHON3 = "py3"
 LANG_PHP = "php"
 LANG_JAVA = "java"
+LANG_CS = "cs"
 
 LANGUAGE_NAMES = {
     LANG_C: "C",
+    LANG_CS: "C#",
     LANG_CPP: "C++",
     LANG_PASCAL: "Pascal",
     LANG_PYTHON: "Python 2",
@@ -72,13 +74,14 @@ LANGUAGE_NAMES = {
     LANG_JAVA: "Java",
 }
 
-LANGUAGES = [LANG_C, LANG_CPP, LANG_PASCAL, LANG_PYTHON, LANG_PYTHON3, LANG_PHP, LANG_JAVA]
+LANGUAGES = [LANG_C, LANG_CS, LANG_CPP, LANG_PASCAL, LANG_PYTHON, LANG_PYTHON3, LANG_PHP, LANG_JAVA]
 DEFAULT_LANGUAGES = [LANG_C, LANG_CPP, LANG_PASCAL, LANG_PYTHON, LANG_PYTHON3, LANG_JAVA]
 
 # A reference for extension-based automatic language detection.
 # (It's more difficult with headers because ".h" is ambiguous.)
 SOURCE_EXT_TO_LANGUAGE_MAP = {
     ".c": LANG_C,
+    ".cs": LANG_CS,
     ".cpp": LANG_CPP,
     ".cxx": LANG_CPP,
     ".cc": LANG_CPP,
@@ -94,6 +97,7 @@ SOURCE_EXT_TO_LANGUAGE_MAP = {
 # Our preferred source file and header file extension for each language.
 LANGUAGE_TO_SOURCE_EXT_MAP = {
     LANG_C: ".c",
+    LANG_CS: ".cs",
     LANG_CPP: ".cpp",
     LANG_PASCAL: ".pas",
     LANG_PYTHON: ".py",

@@ -28,7 +28,7 @@ import logging
 
 from cms import LANGUAGES, LANGUAGE_TO_SOURCE_EXT_MAP, \
     LANGUAGE_TO_HEADER_EXT_MAP
-from cms import LANG_JAVA
+from cms import LANG_JAVA, LANG_CS
 from cms.grading import get_compilation_commands, get_evaluation_commands, \
     compilation_step, evaluation_step, human_evaluation_message, \
     is_evaluation_passed, extract_outcome_and_text, white_diff_step
@@ -218,6 +218,8 @@ class Batch(TaskType):
         language = job.language
         if job.language == LANG_JAVA: # Somewhy JVM will only work with 9 processes or more
             sandbox.max_processes = 20
+        elif job.language == LANG_CS: # And C# needs at least 2
+            sandbox.max_processes = 5
 
         commands = get_evaluation_commands(language, executable_filename, job)
         executables_to_get = {

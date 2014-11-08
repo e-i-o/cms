@@ -798,6 +798,7 @@ class IsolateSandbox(SandboxBase):
         self.dirs = []                 # -d
         self.dirs += [(self.inner_temp_dir, self.path, "rw")]
         self.dirs += [("/opt/rh/devtoolset-2/root", None, None)]
+        self.dirs += [("/opt/mono", None, None)]
         self.preserve_env = False      # -e
         self.inherit_env = []          # -E
         self.set_env = {}              # -E

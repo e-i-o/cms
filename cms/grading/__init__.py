@@ -36,7 +36,7 @@ from collections import namedtuple
 
 from sqlalchemy.orm import joinedload
 
-from cms import LANG_C, LANG_CPP, LANG_PASCAL, LANG_PYTHON, LANG_PYTHON3, LANG_PHP, LANG_JAVA
+from cms import LANG_C, LANG_CS, LANG_CPP, LANG_PASCAL, LANG_PYTHON, LANG_PYTHON3, LANG_PHP, LANG_JAVA
 from cms.db import Submission
 from cms.grading.Sandbox import Sandbox
 
@@ -144,6 +144,9 @@ def get_compilation_commands(language, source_filenames, executable_filename,
         jar_command = ["/bin/bash", "-c", "/usr/local/jdk1.8.0_20/bin/jar cfe %s.jar %s *.class" % (class_name, class_name)]
         mv_command = ["/bin/mv", "%s.jar" % class_name, class_name]
         commands += [javac_command, jar_command, mv_command]
+    elif language == LANG_CS:
+        command = ["/opt/mono/bin/mcs", source_filenames[0], "-out:%s" % executable_filename]
+        commands.append(command)
     else:
         raise ValueError("Unknown language %s." % language)
     return commands
@@ -179,6 +182,9 @@ def get_evaluation_commands(language, executable_filename, job=None):
         commands.append(command)
     elif language == LANG_JAVA:
         command = ["/usr/local/jdk1.8.0_20/bin/java", "-Xmx%dM" % job.memory_limit, "-jar", executable_filename]
+        commands.append(command)
+    elif language == LANG_CS:
+        command = ["/opt/mono/bin/mono", executable_filename]
         commands.append(command)
     else:
         raise ValueError("Unknown language %s." % language)
