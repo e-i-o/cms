@@ -246,11 +246,16 @@ class Batch(TaskType):
             sandbox.create_file_from_storage(filename, digest)
 
         # Actually performs the execution
+        memory_limit = job.memory_limit
+        if language == LANG_JAVA:
+            memory_limit = 0  # JVM is unhappy with that, we'll use -Xmx option instead
+        elif language == LANG_CS:
+            memory_limit += 100  # It seems that mono needs an extra 100 or so MB to feel happy
         success, plus = evaluation_step(
             sandbox,
             commands,
             job.time_limit,
-            job.memory_limit if language != LANG_JAVA else 0,
+            memory_limit,
             stdin_redirect=stdin_redirect,
             stdout_redirect=stdout_redirect)
 
