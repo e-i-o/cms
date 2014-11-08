@@ -7,6 +7,3 @@ cms.egg-info
 .testfailures
 .unittestfailures
 .coverage*
-cache/
-lib/
-log/
