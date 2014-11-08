@@ -508,7 +508,7 @@ msgid "%d unread"
 msgstr "%d lugemata"
 
 msgid "Until contest starts:"
-msgstr "Võistluse algus on:"
+msgstr "Võistluse alguseni on jäänud:"
 
 msgid "Until contest ends:"
 msgstr "Võislus lõpp on"
