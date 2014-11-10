@@ -377,6 +377,9 @@ class Dataset(Base):
     time_limit = Column(
         Float,
         nullable=True)
+    time_limit_python = Column(
+        Float,
+        nullable=True)
     memory_limit = Column(
         Integer,
         nullable=True)

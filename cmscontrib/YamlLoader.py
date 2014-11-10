@@ -443,6 +443,7 @@ class YamlLoader(Loader):
         args["autojudge"] = False
 
         load(conf, args, ["time_limit", "timeout"], conv=float)
+        load(conf, args, "time_limit_python", conv=float)
         load(conf, args, ["memory_limit", "memlimit"])
         load(conf, args, "score_type")
 

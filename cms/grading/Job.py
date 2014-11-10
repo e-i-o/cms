@@ -41,6 +41,7 @@ from __future__ import unicode_literals
 
 import json
 
+from cms import LANG_PYTHON, LANG_PYTHON3
 from cms.db import File, Manager, Executable, UserTestExecutable, Evaluation
 
 
@@ -470,7 +471,6 @@ class JobGroup(object):
         job.files = dict(submission.files)
         job.managers = dict(dataset.managers)
         job.executables = dict(submission_result.executables)
-        job.time_limit = dataset.time_limit
         job.memory_limit = dataset.memory_limit
 
         testcase = dataset.testcases[testcase_codename]
@@ -478,7 +478,12 @@ class JobGroup(object):
         job.output = testcase.output
         job.info = "evaluate submission %d on testcase %s" % \
                    (submission.id, testcase.codename)
-
+        if job.language in [LANG_PYTHON, LANG_PYTHON3] and dataset.time_limit_python is not None:
+            job.time_limit = dataset.time_limit_python
+            job.info = job.info + " (using python time limits: %d)" % job.time_limit
+        else:
+            job.time_limit = dataset.time_limit
+ 
         jobs = {testcase.codename: job}
 
         return JobGroup(jobs)
