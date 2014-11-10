@@ -1296,15 +1296,15 @@ class SubmissionStatusHandler(BaseHandler):
                 self._("Evaluated"), self._("details"))
 
             if score_type is not None and score_type.max_public_score != 0:
-                data["max_public_score"] = "%g" % \
+                data["max_public_score"] = "%d" % \
                     round(score_type.max_public_score, task.score_precision)
-            data["public_score"] = "%g" % \
+            data["public_score"] = "%d" % \
                 round(sr.public_score, task.score_precision)
             if submission.token is not None:
                 if score_type is not None and score_type.max_score != 0:
-                    data["max_score"] = "%g" % \
+                    data["max_score"] = "%d" % \
                         round(score_type.max_score, task.score_precision)
-                data["score"] = "%g" % \
+                data["score"] = "%d" % \
                     round(sr.score, task.score_precision)
 
         self.write(data)
