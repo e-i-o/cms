@@ -159,9 +159,9 @@ class ScoreTypeGroup(ScoreTypeAlone):
 {% from cms.server import format_size %}
 {% for st in details %}
     {% if "score" in st and "max_score" in st %}
-        {% if st["score"] >= st["max_score"] %}
+        {% if len([t for t in st["testcases"] if t["outcome"] == "Correct"]) == len(st["testcases"]) %}
 <div class="subtask correct">
-        {% elif st["score"] <= 0.0 %}
+        {% elif len([t for t in st["testcases"] if t["outcome"] == "Not correct"]) == len(st["testcases"]) %}
 <div class="subtask notcorrect">
         {% else %}
 <div class="subtask partiallycorrect">
