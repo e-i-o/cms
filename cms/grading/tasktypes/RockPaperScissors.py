@@ -70,7 +70,7 @@ class RockPaperScissors(Batch):
 
         commands = get_evaluation_commands(language, executable_filename, job)
         cmd = ' '.join(commands[0])
-        commands = [["/usr/local/bin/rock_paper_scissors_judge", cmd, "judge_program", "--time=10"]]
+        commands = [["/usr/local/bin/rock_paper_scissors_judge", cmd, "judge_program"]]
         executables_to_get = {
             executable_filename:
             job.executables[executable_filename].digest
@@ -184,4 +184,4 @@ class RockPaperScissors(Batch):
         job.outcome = "%s" % outcome if outcome is not None else None
         job.text = text
 
-        #delete_sandbox(sandbox)
+        delete_sandbox(sandbox)
