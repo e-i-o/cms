@@ -141,9 +141,13 @@ def get_compilation_commands(language, source_filenames, executable_filename,
     elif language == LANG_JAVA:
         class_name = os.path.splitext(source_filenames[0])[0]
         javac_command = ["/usr/local/jdk1.8.0_20/bin/javac"] + source_filenames
+        error_message = r"Error: File %s.class not found.\n" % executable_filename + \
+        r"Please, make sure that your solution is written in a public static main() method of a public class named %s.\n" % executable_filename + \
+        "Yes, we know that it is unusual to have class names starting with a lowercase letter, but that is how we decided we want it here."
+        classtest_command = ["/bin/bash", "-c", "test -f %s.class || (echo -e '%s' && exit 1)" % (executable_filename, error_message)]
         jar_command = ["/bin/bash", "-c", "/usr/local/jdk1.8.0_20/bin/jar cfe %s.jar %s *.class" % (class_name, class_name)]
         mv_command = ["/bin/mv", "%s.jar" % class_name, class_name]
-        commands += [javac_command, jar_command, mv_command]
+        commands += [javac_command, classtest_command, jar_command, mv_command]
     elif language == LANG_CS:
         command = ["/opt/mono/bin/mcs", source_filenames[0], "-out:%s" % executable_filename]
         commands.append(command)
