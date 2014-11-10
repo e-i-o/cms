@@ -70,7 +70,8 @@ class Config(object):
         else:
             self.log_dir = os.path.join("log", "ranking")
             self.lib_dir = os.path.join("lib", "ranking")
-            paths = [os.path.join(".", "examples", "cms.ranking.conf"),
+            paths = ["cms.ranking.conf",
+                     os.path.join(".", "examples", "cms.ranking.conf"),
                      os.path.join("/", "usr", "local", "etc",
                                   "cms.ranking.conf"),
                      os.path.join("/", "etc", "cms.ranking.conf")]
