@@ -29,6 +29,7 @@ import logging
 import os
 import os.path
 import sys
+import glob
 import yaml
 from datetime import timedelta
 
@@ -360,25 +361,22 @@ class YamlLoader(Loader):
 
         primary_language = load(conf, None, "primary_language")
         if primary_language is None:
-            primary_language = 'it'
-        paths = [os.path.join(task_path, "statement", "statement.pdf"),
-                 os.path.join(task_path, "testo", "testo.pdf")]
-        for path in paths:
-            if os.path.exists(path):
-                digest = self.file_cacher.put_file_from_path(
-                    path,
-                    "Statement for task %s (lang: %s)" % (name,
-                                                          primary_language))
-                break
-        else:
-            logger.critical("Couldn't find any task statement, aborting...")
-            sys.exit(1)
-        args["statements"] = [Statement(primary_language, digest)]
+            primary_language = 'et'
 
-        args["primary_statements"] = '["%s"]' % (primary_language)
-
+        statement_paths = glob.glob("%s/statement/statement.*.pdf" % task_path)
+        languages = []
+        statements = []
+        if len(statement_paths) == 0:
+            logger.warning("No statements found!")
+        for s in statement_paths:
+            lang = s.split('.')[-2]
+            languages.append(lang)
+            digest = self.file_cacher.put_file_from_path(s, "Statement for task %s (lang: %s)" % (name, lang))
+            statements.append(Statement(lang, digest))
+            logger.info("Loaded statement for language %s" % lang)
+        args["statements"] = statements
+        args["primary_statements"] = "[" + ','.join(['"%s"' % lang for lang in languages]) + "]"
         args["attachments"] = []  # FIXME Use auxiliary
-
         args["submission_format"] = [
             SubmissionFormatElement("%s.%%l" % name)]
 
@@ -634,11 +632,16 @@ class YamlLoader(Loader):
 
             # Otherwise, the task type is Batch
             else:
-                args["task_type"] = "Batch"
-                args["task_type_parameters"] = \
-                    '["%s", ["%s", "%s"], "%s"]' % \
-                    (compilation_param, infile_param, outfile_param,
-                     evaluation_param)
+                if conf.get("task_type", None) is None:
+                    args["task_type"] = "Batch"
+                    args["task_type_parameters"] = \
+                        '["%s", ["%s", "%s"], "%s"]' % \
+                        (compilation_param, infile_param, outfile_param,
+                         evaluation_param)
+                else:
+                    load(conf, args, "task_type")
+                    load(conf, args, "task_type_parameters")
+                    assert "task_type_parameters" in args, "When providing task_type, you must also provide task_type_parameters"
 
         args["testcases"] = []
         for i in xrange(n_input):
