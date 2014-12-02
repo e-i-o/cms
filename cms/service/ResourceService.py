@@ -194,8 +194,7 @@ class ResourceService(Service):
                           if services[x].ip == local_machine]
         return sorted(local_services)
 
-    @staticmethod
-    def _is_service_proc(service, cmdline):
+    def _is_service_proc(self, service, cmdline):
         """Returns if cmdline can be the command line of service.
 
         service (ServiceCoord): the service.
@@ -218,7 +217,8 @@ class ResourceService(Service):
         cl_interpreter = cmdline[start_index]
         cl_service = cmdline[start_index + 1]
         if "python" not in cl_interpreter or \
-                not cl_service.endswith("cms%s" % service.name):
+                not cl_service.endswith("cms%s" % service.name) or \
+                not (cmdline[-2] == '-c' and cmdline[-1] == str(self.contest_id)):  # We assume all processes are launched with (-c <contest_id>) in the end.
             return False
 
         # We assume that apart from the shard, all other
@@ -249,7 +249,7 @@ class ResourceService(Service):
         for proc in psutil.get_process_list():
             try:
                 proc_info = proc.as_dict(attrs=PSUTIL_PROC_ATTRS)
-                if ResourceService._is_service_proc(
+                if self._is_service_proc(
                         service, proc_info["cmdline"]):
                     self._services_prev_cpu_times[service] = \
                         proc_info["cpu_times"]
