@@ -262,6 +262,26 @@ var DataStore = new function () {
     self.team_count = 0;
 
     self.init_teams = function () {
+        data = {school: {name: "School"}, university: {name: "University"}, other: {name: "Other"}};
+        self.team_init_time = 0;
+        for (var key in data) {
+                self.create_team(key, data[key]);
+        }
+        $.ajax({
+            url: "/data.json",
+            dataType: "json",
+            success: function (data, status, xhr) {
+                console.info("Loaded user team data");
+                self.user_team_data = data;
+            },
+            error: function () {
+                console.error("Error while getting the list of teams");
+                self.update_network_status(4);
+            }
+        });
+
+        self.init_users();
+        /*
         $.ajax({
             url: Config.get_team_list_url(),
             dataType: "json",
@@ -276,7 +296,7 @@ var DataStore = new function () {
                 console.error("Error while getting the list of teams");
                 self.update_network_status(4);
             }
-        });
+        });*/
     }
 
     self.team_listener = function (event) {
@@ -410,6 +430,8 @@ var DataStore = new function () {
     };
 
     self.create_user = function (key, data) {
+        var uid = data["f_name"] + "-" + data["l_name"];
+        if (self.user_team_data[uid] !== undefined) data["team"] = self.user_team_data[uid];
         if (data["team"] !== null && self.teams[data["team"]] === undefined)
         {
             console.error("Could not find team " + data["team"] + " for user " + key);

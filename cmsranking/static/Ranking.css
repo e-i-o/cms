@@ -40,6 +40,7 @@ abbr {
     top: 24px;
     left: 24px;
     width: 200px;
+    display: none;
 }
 
 #UpperPanel {
@@ -55,6 +56,7 @@ abbr {
     background-color: #EAEAEC;
     box-shadow: 0 0 2px 0 gray;
     z-index: 100;
+    display: none;
 }
 
 #SidePanel {
@@ -71,12 +73,13 @@ abbr {
     box-shadow: 0 0 2px 0 gray;
     z-index: 8;
     padding: 0;
+    display: none;
 }
 
 #InnerFrame {
     position: absolute;
-    top: 3em;
-    left: 220px;
+    top: 10px;
+    left: 10px;
     right: 0;
     bottom: 0;
     margin: 2px 0 0 2px;
@@ -94,9 +97,9 @@ abbr {
 
 #TimeView {
     position: absolute;
-    top: 208px;
+    top: 0px;
     left: 0;
-    width: 220px;
+    width: 100%;
     z-index: 10;
     text-align: center;
 }
@@ -258,6 +261,7 @@ abbr {
     font: inherit;
     background-color: #FFFFFF;
     outline: 0;
+    display: none;
 }
 
 #TeamSearch_bg {
@@ -378,6 +382,7 @@ abbr {
 }
 
 #Scoreboard_cols col.sel {
+    visibility: hidden;
     width: 2em;
 }
 
@@ -442,6 +447,7 @@ abbr {
     background-image: url('img/tick_black.png');
     background-repeat: no-repeat;
     background-position: center;
+    visibility: hidden;
 }
 
 #Scoreboard_head tr th.score {
@@ -473,6 +479,7 @@ abbr {
 
 #Scoreboard_body tr td.sel {
     background: url('img/tick_black.png') no-repeat center transparent;
+    visibility: hidden;
     opacity: 0;
     -webkit-user-select: none;
        -moz-user-select: none;
@@ -919,7 +926,7 @@ abbr {
 #UserDetail_team,
 #UserDetail_flag {
     position: absolute;
-    right: 470px;
+    left: 10px;
     font-size: 2em;
     line-height: 1.5em;
 }
@@ -938,10 +945,12 @@ abbr {
 
 #UserDetail_flag {
     bottom: 0;
+    display: none;
 }
 
 #UserDetail_face {
     position: absolute;
+    display: none;
     top: 0;
     left: 0;
     max-width: 160px;

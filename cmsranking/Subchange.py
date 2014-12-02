@@ -87,6 +87,8 @@ class Subchange(Entity):
         self.score = (data['score'] if 'score' in data else None)
         self.token = (data['token'] if 'token' in data else None)
         self.extra = (data['extra'] if 'extra' in data else None)
+        if self.score > 50:
+            self.score = self.score / 1000000 * 50
 
     def get(self):
         result = self.__dict__.copy()

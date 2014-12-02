@@ -99,6 +99,8 @@ class Task(Entity):
         self.score_precision = data['score_precision']
         self.extra_headers = data['extra_headers']
         self.order = data['order']
+        if self.short_name == 'mang':
+            self.max_score = 50
 
     def get(self):
         result = self.__dict__.copy()
