@@ -352,6 +352,7 @@ class YamlLoader(Loader):
         args["num"] = num
         load(conf, args, ["name", "nome_breve"])
         load(conf, args, ["title", "nome"])
+        load(conf, args, "divisions")
 
         assert name == args["name"]
 

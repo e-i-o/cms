@@ -206,6 +206,9 @@ class Task(Base):
         # this relationship.
         post_update=True)
 
+    # Space-separated list of divisions that should see the task (for multi-division contests)
+    divisions = Column(Unicode, nullable=True)
+
     # Follows the description of the fields automatically added by
     # SQLAlchemy.
     # datasets (list of Dataset objects)
@@ -505,3 +508,5 @@ class Testcase(Base):
     output = Column(
         String,
         nullable=False)
+
+
