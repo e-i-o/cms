@@ -298,6 +298,7 @@ class YamlLoader(Loader):
 
         load(conf, args, "password")
         load(conf, args, "ip")
+        load(conf, args, "division")
 
         load(conf, args, ["first_name", "nome"])
         load(conf, args, ["last_name", "cognome"])
@@ -352,6 +353,7 @@ class YamlLoader(Loader):
         args["num"] = num
         load(conf, args, ["name", "nome_breve"])
         load(conf, args, ["title", "nome"])
+        load(conf, args, "divisions")
 
         assert name == args["name"]
 

@@ -78,6 +78,11 @@ class User(Base):
         nullable=False,
         default=generate_random_password)
 
+    # The division in which the user participates (for multi-division contests)
+    division = Column(
+        Unicode,
+        nullable=True)
+
     # Email for any communications in case of remote contest.
     email = Column(
         Unicode,
