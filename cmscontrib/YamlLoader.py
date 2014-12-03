@@ -661,7 +661,13 @@ class YamlLoader(Loader):
                                 conv=lambda x: "" if x is None else x)
         if public_testcases != "":
             for x in public_testcases.split(","):
-                args["testcases"][int(x.strip())].public = True
+                # allow usage of inclusive ranges!
+                if ".." in x:
+                    frm, to = map(int, x.strip().split(".."))
+                else:
+                    frm = to = int(x.strip())
+                for i in range(frm, to+1):
+                    args["testcases"][i].public = True
 
         dataset = Dataset(**args)
         task.active_dataset = dataset
