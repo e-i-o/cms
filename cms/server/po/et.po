@@ -529,7 +529,7 @@ msgid "Statement"
 msgstr "Ülesande tekst"
 
 msgid "Submissions"
-msgstr "Esitatud lahendused"
+msgstr "Lahenduse esitamine"
 
 msgid "Documentation"
 msgstr "Dokumentatsioon"
@@ -881,7 +881,7 @@ msgid "no statement available"
 msgstr "ülesande teksti pole"
 
 msgid "Download task statement"
-msgstr "Laadi ülesande tekst"
+msgstr "Lae alla ülesande tekst"
 
 msgid ""
 "The statement for this task is available in multiple versions, in different "
