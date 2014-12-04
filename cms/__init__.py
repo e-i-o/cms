@@ -57,7 +57,7 @@ __all__ = [
 LANG_C = "c"
 LANG_CPP = "cpp"
 LANG_PASCAL = "pas"
-LANG_PYTHON = "py"
+LANG_PYTHON = "py2"
 LANG_PYTHON3 = "py3"
 LANG_PHP = "php"
 LANG_JAVA = "java"
@@ -88,7 +88,7 @@ SOURCE_EXT_TO_LANGUAGE_MAP = {
     ".C": LANG_CPP,
     ".c++": LANG_CPP,
     ".pas": LANG_PASCAL,
-    ".py": LANG_PYTHON,
+    ".py2": LANG_PYTHON,
     ".py3": LANG_PYTHON3,
     ".php": LANG_PHP,
     ".java": LANG_JAVA,
@@ -100,7 +100,7 @@ LANGUAGE_TO_SOURCE_EXT_MAP = {
     LANG_CS: ".cs",
     LANG_CPP: ".cpp",
     LANG_PASCAL: ".pas",
-    LANG_PYTHON: ".py",
+    LANG_PYTHON: ".py2",
     LANG_PYTHON3: ".py3",
     LANG_PHP: ".php",
     LANG_JAVA: ".java",
