@@ -125,7 +125,7 @@ def get_compilation_commands(language, source_filenames, executable_filename,
         # /usr/bin/python3 -m py_compile %s
         # mv __pycache__/%s.*.pyc %s
         py_command = ["/usr/bin/python2.7", "-m", "py_compile", source_filenames[0]]
-        mv_command = ["/bin/mv", "%s.pyc" % os.path.splitext(os.path.basename(
+        mv_command = ["/bin/mv", "%s.py2c" % os.path.splitext(os.path.basename(
                               source_filenames[0]))[0], executable_filename]
         commands.append(py_command)
         commands.append(mv_command)
