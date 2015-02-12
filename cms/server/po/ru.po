@@ -24,6 +24,9 @@ msgstr ""
 msgid "N/A"
 msgstr "Н/Д"
 
+msgid "NB: Only the score of your most recent submission counts!"
+msgstr "NB: Учитываются лишь очки последнего отправленного решения!"
+
 msgid "Compilation succeeded"
 msgstr "Успешная компиляция"
 

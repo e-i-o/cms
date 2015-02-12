@@ -21,6 +21,9 @@ msgstr ""
 msgid "N/A"
 msgstr "-"
 
+msgid "NB: Only the score of your most recent submission counts!"
+msgstr "NB: Arvesse läheb ainult viimase esitatud lahenduse skoor!"
+
 msgid "Compilation succeeded"
 msgstr "Kompileerimine õnnestus"
 
