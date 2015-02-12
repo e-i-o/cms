@@ -553,7 +553,7 @@ class YamlLoader(Loader):
                                 subtasks.append([points, testcases])
                             # Open the new one
                             testcases = 0
-                            points = int(comment[3:].strip())
+                            points = float(comment[3:].strip())
 
                 # Close last subtask (if no subtasks were defined, just
                 # fallback to Sum)
