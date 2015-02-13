@@ -12,15 +12,14 @@ from cms.grading.scoretypes.GroupSum import GroupSum
 import logging
 log = logging.getLogger(__name__)
 
-class GroupSumConditional(GroupSum):
+class GroupSumAtLeastTwo(GroupSum):
     """The score of a submission is the sum of group scores,
     and each group score is the sum of testcase scores in the group.
 
-    In addition, some groups may be marked as "compulsory". If all compulsory groups
-    have a score of 0, the whole solution gets a score of 0.
+    If the number of groups that have a nonzero score is 1, the whole solution
+    gets a score of 0.
 
-    Parameters are [[m, t, c], ... ], where [m, t] are like in ScoreTypeGroup,
-    and c is 1 to mark "compulsory" groups.
+    Parameters are [[m, t], ... ] (see ScoreTypeGroup).
 
     """
 
@@ -99,14 +98,13 @@ class GroupSumConditional(GroupSum):
                            if "score" in st)
 
         # This is the only difference with the original
-        # Here we go through a list of subtasks that are labeled as "compulsory"
-        # (i.e. have 1 as the third argument of their parameter)
-        # If all of them have 0 score, we set the whole score to 0.
-        compulsory_scores = []
-        for st_idx, param in enumerate(self.parameters):
-            if len(param) > 2 and param[2] == 1:
-                compulsory_scores.append(subtasks[st_idx]["score"] > 0)
-        if len(compulsory_scores) > 0 and True not in compulsory_scores:
+        # Here we check that at least two subtasks have nonzero score.
+        # If not so, the whole score is 0.
+        num_nonzero_groups = 0
+        for st in subtasks:
+            if (st["score"] > 0):
+                num_nonzero_groups += 1
+        if num_nonzero_groups <= 1:
             score = 0
             public_score = 0
 

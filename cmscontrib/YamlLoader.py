@@ -529,7 +529,7 @@ class YamlLoader(Loader):
                         comment = comment.strip()
                         testcase_detected = testcase != ''
                         copy_testcase_detected = comment.startswith("COPY:")
-                        subtask_detected = comment.startswith('ST:')
+                        subtask_detected = comment.startswith('ST:') or comment.startswith('ST-COMPULSORY:')
 
                         flags = [testcase_detected,
                                  copy_testcase_detected,
@@ -550,10 +550,14 @@ class YamlLoader(Loader):
                             if points is None:
                                 assert(testcases == 0)
                             else:
-                                subtasks.append([points, testcases])
+                                if subtask_compulsory:
+                                    subtasks.append([points, testcases, 1])
+                                else:
+                                    subtasks.append([points, testcases])
                             # Open the new one
                             testcases = 0
-                            points = float(comment[3:].strip())
+                            points = float(comment.split(':')[1].strip())
+                            subtask_compulsory = comment.startswith('ST-COMPULSORY:')
 
                 # Close last subtask (if no subtasks were defined, just
                 # fallback to Sum)
@@ -566,10 +570,13 @@ class YamlLoader(Loader):
                         input_value = total_value / n_input
                     args["score_type_parameters"] = "%s" % input_value
                 else:
-                    subtasks.append([points, testcases])
+                    if subtask_compulsory:
+                        subtasks.append([points, testcases, 1])
+                    else:
+                        subtasks.append([points, testcases])
                     #assert(100 == sum([int(st[0]) for st in subtasks]))
                     n_input = sum([int(st[1]) for st in subtasks])
-                    assert args["score_type"] in ["GroupMin", "GroupMul", "GroupSum"]
+                    assert args["score_type"] in ["GroupMin", "GroupMul", "GroupSum", "GroupSumConditional", "GroupSumAtLeastTwo"]
                     args["score_type_parameters"] = "%s" % subtasks
 
                 if "n_input" in conf:
