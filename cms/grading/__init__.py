@@ -149,7 +149,7 @@ def get_compilation_commands(language, source_filenames, executable_filename,
         mv_command = ["/bin/mv", "%s.jar" % class_name, class_name]
         commands += [javac_command, classtest_command, jar_command, mv_command]
     elif language == LANG_CS:
-        command = ["/opt/mono/bin/mcs", source_filenames[0], "-out:%s" % executable_filename]
+        command = ["/opt/mono/bin/mcs", "/reference:System.Drawing.dll", source_filenames[0], "-out:%s" % executable_filename]
         commands.append(command)
     else:
         raise ValueError("Unknown language %s." % language)
