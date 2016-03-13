@@ -225,7 +225,10 @@ def format_status_text(status, translator=None):
         elif not isinstance(status, list):
             raise TypeError("Invalid type: %r" % type(status))
 
-        return translator(status[0]) % tuple(status[1:])
+        if status[0].strip() == "":
+            return ""
+        else:
+            return translator(status[0]) % tuple(status[1:])
     except:
         logger.error("Unexpected error when formatting status "
                      "text: %r", status, exc_info=True)
