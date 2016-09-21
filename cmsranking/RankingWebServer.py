@@ -326,7 +326,7 @@ def ScoreHandler(request, response):
     response.headers[b'Timestamp'] = b"%0.6f" % time.time()
     response.mimetype = "application/json"
     response.data = json.dumps(result)
-
+    print(response.data)
 
 class ImageHandler(object):
     EXT_TO_MIME = {

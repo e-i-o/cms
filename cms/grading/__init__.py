@@ -784,6 +784,9 @@ def task_score(user, task):
     # The maximum score amongst the tokened submissions (invalid
     # scores count as 0.0).
     max_tokened_score = 0.0
+    # Max score overall
+    max_score = 0.0
+
     # If the score could change due to submission still being compiled
     # / evaluated / scored.
     partial = False
@@ -807,10 +810,15 @@ def task_score(user, task):
 
     for s in submissions:
         sr = s.get_result(task.active_dataset)
+        if sr is not None and sr.scored():
+            max_score = max(max_score, sr.score)
+        else:
+            partial = True
         if s.tokened():
             if sr is not None and sr.scored():
                 max_tokened_score = max(max_tokened_score, sr.score)
             else:
                 partial = True
 
-    return max(last_score, max_tokened_score), partial
+    #return max(last_score, max_tokened_score), partial    # Original code
+    return max_score, partial   # EIO-changes

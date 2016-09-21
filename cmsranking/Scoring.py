@@ -107,7 +107,7 @@ class Score(object):
             self._submissions[s_id].token = change.token
         if change.extra is not None:
             self._submissions[s_id].extra = change.extra
-        if self._submissions[s_id].token:
+        if self._submissions[s_id].token or True:   # The OR TRUE was added to take into account max of ALL submissions
             self._released.insert(self._submissions[s_id].score)
         if change.score is not None and \
                 (self._last is None or
