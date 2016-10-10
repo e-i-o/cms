@@ -62,6 +62,7 @@ LANG_PYTHON3 = "py3"
 LANG_PHP = "php"
 LANG_JAVA = "java"
 LANG_CS = "cs"
+LANG_RUST = "rust"
 
 LANGUAGE_NAMES = {
     LANG_C: "C",
@@ -71,10 +72,11 @@ LANGUAGE_NAMES = {
     LANG_PYTHON: "Python 2",
     LANG_PYTHON3: "Python 3",
     LANG_PHP: "PHP",
+    LANG_RUST: "Rust",
     LANG_JAVA: "Java",
 }
 
-LANGUAGES = [LANG_C, LANG_CS, LANG_CPP, LANG_PASCAL, LANG_PYTHON, LANG_PYTHON3, LANG_PHP, LANG_JAVA]
+LANGUAGES = [LANG_C, LANG_CS, LANG_CPP, LANG_PASCAL, LANG_PYTHON, LANG_PYTHON3, LANG_PHP, LANG_RUST, LANG_JAVA]
 DEFAULT_LANGUAGES = LANGUAGES   # Support all languages by default
 
 # A reference for extension-based automatic language detection.
@@ -91,6 +93,7 @@ SOURCE_EXT_TO_LANGUAGE_MAP = {
     ".py2": LANG_PYTHON,
     ".py3": LANG_PYTHON3,
     ".php": LANG_PHP,
+    ".rs": LANG_RUST,
     ".java": LANG_JAVA,
 }
 
@@ -103,6 +106,7 @@ LANGUAGE_TO_SOURCE_EXT_MAP = {
     LANG_PYTHON: ".py2",
     LANG_PYTHON3: ".py3",
     LANG_PHP: ".php",
+    LANG_RUST: ".rs",
     LANG_JAVA: ".java",
 }
 LANGUAGE_TO_HEADER_EXT_MAP = {

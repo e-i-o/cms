@@ -36,7 +36,7 @@ from collections import namedtuple
 
 from sqlalchemy.orm import joinedload
 
-from cms import LANG_C, LANG_CS, LANG_CPP, LANG_PASCAL, LANG_PYTHON, LANG_PYTHON3, LANG_PHP, LANG_JAVA
+from cms import LANG_C, LANG_CS, LANG_CPP, LANG_PASCAL, LANG_PYTHON, LANG_PYTHON3, LANG_PHP, LANG_RUST, LANG_JAVA
 from cms.db import Submission
 from cms.grading.Sandbox import Sandbox
 
@@ -151,6 +151,9 @@ def get_compilation_commands(language, source_filenames, executable_filename,
     elif language == LANG_CS:
         command = ["/opt/mono/bin/mcs", "/reference:System.Drawing.dll", source_filenames[0], "-out:%s" % executable_filename]
         commands.append(command)
+    elif language == LANG_RUST:
+        command = ["/usr/local/bin/rustc", source_filenames[0], "-O", "-o %s" % executable_filename]
+        commands.append(command)
     else:
         raise ValueError("Unknown language %s." % language)
     return commands
@@ -170,7 +173,7 @@ def get_evaluation_commands(language, executable_filename, job=None):
 
     """
     commands = []
-    if language in (LANG_C, LANG_CPP, LANG_PASCAL):
+    if language in (LANG_C, LANG_CPP, LANG_PASCAL, LANG_RUST):
         command = [os.path.join(".", executable_filename)]
         commands.append(command)
     elif language == LANG_PYTHON:
