@@ -152,7 +152,7 @@ def get_compilation_commands(language, source_filenames, executable_filename,
         command = ["/opt/mono/bin/mcs", "/reference:System.Drawing.dll", source_filenames[0], "-out:%s" % executable_filename]
         commands.append(command)
     elif language == LANG_RUST:
-        command = ["/usr/local/bin/rustc", source_filenames[0], "-O", "-o %s" % executable_filename]
+        command = ["/usr/local/bin/rustc", source_filenames[0], "-O", "-o%s" % executable_filename]
         commands.append(command)
     else:
         raise ValueError("Unknown language %s." % language)
