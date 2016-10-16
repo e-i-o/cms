@@ -69,8 +69,7 @@ class LogiInteractor(Batch):
             sandbox.max_processes = 1+2
 
         commands = get_evaluation_commands(language, executable_filename, job)
-        cmd = ' '.join(commands[0])
-        commands = [["/usr/local/bin/pipexec", "--", "[A", "/usr/local/bin/logi_interactor", "input.txt", "output.txt", "]", "[B", cmd, "]", "{A:1>B:0}", "{B:1>A:0}"]]
+        commands = [["/usr/local/bin/pipexec", "--", "[A", "/usr/local/bin/logi_interactor", "input.txt", "output.txt", "]", "[B"] + commands[0] + ["]", "{A:1>B:0}", "{B:1>A:0}"]]
         executables_to_get = {
             executable_filename:
             job.executables[executable_filename].digest
