@@ -24,6 +24,9 @@ msgstr "-"
 msgid "NB: Only the score of your most recent submission counts!"
 msgstr "NB: Arvesse läheb ainult viimase esitatud lahenduse skoor!"
 
+msgid "NB: The resulting score is the maximum over all submissions."
+msgstr "NB: Arvesse läheb suurima skooriga lahendus."
+
 msgid "Compilation succeeded"
 msgstr "Kompileerimine õnnestus"
 

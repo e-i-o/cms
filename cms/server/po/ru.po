@@ -27,6 +27,9 @@ msgstr "Н/Д"
 msgid "NB: Only the score of your most recent submission counts!"
 msgstr "NB: Учитываются лишь очки последнего отправленного решения!"
 
+msgid "NB: The resulting score is the maximum over all submissions."
+msgstr "NB: Учитываются очки решения с максимальным результатом."
+
 msgid "Compilation succeeded"
 msgstr "Успешная компиляция"
 
