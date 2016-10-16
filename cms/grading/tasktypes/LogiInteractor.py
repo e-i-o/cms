@@ -162,4 +162,4 @@ class LogiInteractor(Batch):
         job.outcome = "%s" % outcome if outcome is not None else None
         job.text = text
 
-        #delete_sandbox(sandbox)
+        delete_sandbox(sandbox)
