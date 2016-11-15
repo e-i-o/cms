@@ -818,6 +818,9 @@ class IsolateSandbox(SandboxBase):
         # packages.
         self.set_env["HOME"] = "./"
 
+        # This is needed for checkers written in C# and compiled via mkbundle
+        self.set_env["LD_LIBRARY_PATH"] = "/opt/mono/lib"
+
         # Tell isolate to get the sandbox ready.
         box_cmd = [self.box_exec] + (["--cg"] if self.cgroup else []) \
             + ["--box-id=%d" % self.box_id] + ["--init"]
