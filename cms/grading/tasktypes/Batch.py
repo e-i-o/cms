@@ -106,6 +106,12 @@ class Batch(TaskType):
         # TODO add some details if a grader/comparator is used, etc...
         return "Batch"
 
+    def get_executable_filename(self, source_filename):
+        if self.parameters[0] == "grader":
+            return "grader"
+        else:
+            return source_filename.replace(".%l", "")
+
     def get_compilation_commands(self, submission_format):
         """See TaskType.get_compilation_commands."""
         res = dict()
@@ -118,7 +124,7 @@ class Batch(TaskType):
             if self.parameters[0] == "grader":
                 source_filenames.append("grader%s" % source_ext)
             source_filenames.append(format_filename.replace(".%l", source_ext))
-            executable_filename = format_filename.replace(".%l", "")
+            executable_filename = self.get_executable_filename(format_filename)
             commands = get_compilation_commands(language,
                                                 source_filenames,
                                                 executable_filename)
@@ -183,7 +189,7 @@ class Batch(TaskType):
             sandbox.create_file_from_storage(filename, digest)
 
         # Prepare the compilation command
-        executable_filename = format_filename.replace(".%l", "")
+        executable_filename = self.get_executable_filename(format_filename)
         commands = get_compilation_commands(language,
                                             source_filenames,
                                             executable_filename)
@@ -214,7 +220,7 @@ class Batch(TaskType):
         sandbox = create_sandbox(file_cacher)
 
         # Prepare the execution
-        executable_filename = job.executables.keys()[0]
+        executable_filename = self.get_executable_filename(job.executables.keys()[0])
         language = job.language
         if job.language == LANG_JAVA: # Somewhy JVM will only work with 9 processes or more
             sandbox.max_processes = 20

@@ -118,22 +118,26 @@ def get_compilation_commands(language, source_filenames, executable_filename,
         command += [source_filenames[0]]
         commands.append(command)
     elif language == LANG_PYTHON:
-        # The executable name is fixed, and there is no way to specify
-        # the name of the pyc, so we need to bundle together two
-        # commands (compilation and rename).
-        # In order to use Python 3 change them to:
-        # /usr/bin/python3 -m py_compile %s
-        # mv __pycache__/%s.*.pyc %s
-        py_command = ["/usr/bin/python2.7", "-m", "py_compile", source_filenames[0]]
-        mv_command = ["/bin/mv", "%s.py2c" % os.path.splitext(os.path.basename(
-                              source_filenames[0]))[0], executable_filename]
-        commands.append(py_command)
+        for s in source_filenames:
+            b = os.path.splitext(os.path.basename(s))[0]
+            py_command = ["/usr/bin/python2.7", "-m", "py_compile", s]
+            mv_command = ["/bin/mv", "%s.py2c" % b, "%s.pyc" % b]
+            zip_command = ["/usr/bin/zip", executable_filename, "%s.pyc" % b]
+            commands.append(py_command)
+            commands.append(mv_command)
+            commands.append(zip_command)
+        mv_command = ["/bin/mv", "%s.zip" % executable_filename, executable_filename]
         commands.append(mv_command)
     elif language == LANG_PYTHON3:
-        py_command = ["/usr/bin/python3.4", "-m", "py_compile", source_filenames[0]]
-        base_name = os.path.splitext(os.path.basename(source_filenames[0]))[0]
-        mv_command = ["/bin/bash", "-c", "/bin/mv __pycache__/%s.*.pyc %s" % (base_name, executable_filename)]
-        commands.append(py_command)
+        for s in source_filenames:
+            b = os.path.splitext(os.path.basename(s))[0]
+            py_command = ["/usr/bin/python3.4", "-m", "py_compile", s]
+            mv_command = ["/bin/mv", "__pycache__/%s.cpython-34.pyc" % b, "%s.pyc" % b]
+            zip_command = ["/usr/bin/zip", executable_filename, "%s.pyc" % b]
+            commands.append(py_command)
+            commands.append(mv_command)
+            commands.append(zip_command)
+        mv_command = ["/bin/mv", "%s.zip" % executable_filename, executable_filename]
         commands.append(mv_command)
     elif language == LANG_PHP:
         command = ["/bin/cp", source_filenames[0], executable_filename]
@@ -177,13 +181,15 @@ def get_evaluation_commands(language, executable_filename, job=None):
         command = [os.path.join(".", executable_filename)]
         commands.append(command)
     elif language == LANG_PYTHON:
-        # In order to use Python 3 change it to:
-        # /usr/bin/python3 %s
-        command = ["/usr/bin/python2.7", executable_filename]
-        commands.append(command)
+        zip_command = ["/usr/bin/unzip", executable_filename]
+        py_command = ["/usr/bin/python2.7", "%s.pyc" % executable_filename]
+        commands.append(zip_command)
+        commands.append(py_command)
     elif language == LANG_PYTHON3:
-        command = ["/usr/bin/python3.4", executable_filename]
-        commands.append(command)
+        zip_command = ["/usr/bin/unzip", executable_filename]
+        py_command = ["/usr/bin/python3.4", "%s.pyc" % executable_filename]
+        commands.append(zip_command)
+        commands.append(py_command)
     elif language == LANG_PHP:
         command = ["/usr/bin/php5", executable_filename]
         commands.append(command)
