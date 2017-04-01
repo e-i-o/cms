@@ -405,6 +405,7 @@ class FileCacher(object):
 
         """
         self.service = service
+        path='/var/home/eio_team/filecache'
 
         if null:
             self.backend = NullBackend()
@@ -421,7 +422,6 @@ class FileCacher(object):
                 "fs-cache-%s-%d" % (service.name, service.shard))
 
         self.temp_dir = os.path.join(self.file_dir, "_temp")
-
         if not mkdir(config.cache_dir) or not mkdir(self.file_dir) \
                 or not mkdir(self.temp_dir):
             logger.error("Cannot create necessary directories.")
