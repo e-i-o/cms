@@ -797,8 +797,6 @@ class IsolateSandbox(SandboxBase):
         self.chdir = self.inner_temp_dir  # -c
         self.dirs = []                 # -d
         self.dirs += [(self.inner_temp_dir, self.path, "rw")]
-        self.dirs += [("/opt/rh/devtoolset-2/root", None, None)]
-        self.dirs += [("/opt/mono", None, None)]
         self.preserve_env = False      # -e
         self.inherit_env = []          # -E
         self.set_env = {}              # -E
@@ -819,7 +817,7 @@ class IsolateSandbox(SandboxBase):
         self.set_env["HOME"] = "./"
 
         # This is needed for checkers written in C# and compiled via mkbundle
-        self.set_env["LD_LIBRARY_PATH"] = "/opt/mono/lib"
+        #self.set_env["LD_LIBRARY_PATH"] = "/opt/mono/lib"
 
         # Tell isolate to get the sandbox ready.
         box_cmd = [self.box_exec] + (["--cg"] if self.cgroup else []) \

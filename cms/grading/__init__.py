@@ -95,7 +95,7 @@ def get_compilation_commands(language, source_filenames, executable_filename,
     """
     commands = []
     if language == LANG_C:
-        command = ["/usr/bin/gcc-4.8"]
+        command = ["/usr/bin/gcc"]
         if for_evaluation:
             command += ["-DEVAL"]
         command += ["-static", "-O2", "-o", executable_filename]
@@ -103,10 +103,10 @@ def get_compilation_commands(language, source_filenames, executable_filename,
         command += ["-lm"]
         commands.append(command)
     elif language == LANG_CPP:
-        command = ["/usr/bin/g++-4.8"]
+        command = ["/usr/bin/g++"]
         if for_evaluation:
             command += ["-DEVAL"]
-        command += ["-static", "-O2", "-std=c++11",
+        command += ["-static", "-O2", "-std=c++17",
                     "-o", executable_filename]
         command += source_filenames
         commands.append(command)
@@ -131,8 +131,8 @@ def get_compilation_commands(language, source_filenames, executable_filename,
     elif language == LANG_PYTHON3:
         for s in source_filenames:
             b = os.path.splitext(os.path.basename(s))[0]
-            py_command = ["/usr/bin/python3.4", "-m", "py_compile", s]
-            mv_command = ["/bin/mv", "__pycache__/%s.cpython-34.pyc" % b, "%s.pyc" % b]
+            py_command = ["/usr/bin/python3.5", "-m", "py_compile", s]
+            mv_command = ["/bin/mv", "__pycache__/%s.cpython-35.pyc" % b, "%s.pyc" % b]
             zip_command = ["/usr/bin/zip", executable_filename, "%s.pyc" % b]
             commands.append(py_command)
             commands.append(mv_command)
@@ -144,19 +144,19 @@ def get_compilation_commands(language, source_filenames, executable_filename,
         commands.append(command)
     elif language == LANG_JAVA:
         class_name = os.path.splitext(source_filenames[0])[0]
-        javac_command = ["/usr/local/jdk1.8.0_20/bin/javac"] + source_filenames
+        javac_command = ["/usr/lib/jvm/java-8-openjdk-amd64/bin/javac"] + source_filenames
         error_message = r"Error: File %s.class not found.\n" % executable_filename + \
         r"Please, make sure that your solution is written in a public static main() method of a public class named %s.\n" % executable_filename + \
         "Yes, we know that it is unusual to have class names starting with a lowercase letter, but that is how we decided we want it here."
         classtest_command = ["/bin/bash", "-c", "test -f %s.class || (echo -e '%s' && exit 1)" % (executable_filename, error_message)]
-        jar_command = ["/bin/bash", "-c", "/usr/local/jdk1.8.0_20/bin/jar cfe %s.jar %s *.class" % (class_name, class_name)]
+        jar_command = ["/bin/bash", "-c", "/usr/lib/jvm/java-8-openjdk-amd64/bin/jar cfe %s.jar %s *.class" % (class_name, class_name)]
         mv_command = ["/bin/mv", "%s.jar" % class_name, class_name]
         commands += [javac_command, classtest_command, jar_command, mv_command]
     elif language == LANG_CS:
-        command = ["/opt/mono/bin/mcs", "/reference:System.Drawing.dll", source_filenames[0], "-out:%s" % executable_filename]
+        command = ["/usr/bin/mcs", source_filenames[0], "-out:%s" % executable_filename]
         commands.append(command)
     elif language == LANG_RUST:
-        command = ["/usr/local/bin/rustc", source_filenames[0], "-O", "-o%s" % executable_filename]
+        command = ["/usr/bin/rustc", source_filenames[0], "-O", "-o%s" % executable_filename]
         commands.append(command)
     else:
         raise ValueError("Unknown language %s." % language)
@@ -187,17 +187,17 @@ def get_evaluation_commands(language, executable_filename, job=None):
         commands.append(py_command)
     elif language == LANG_PYTHON3:
         zip_command = ["/usr/bin/unzip", executable_filename]
-        py_command = ["/usr/bin/python3.4", "%s.pyc" % executable_filename]
+        py_command = ["/usr/bin/python3.5", "%s.pyc" % executable_filename]
         commands.append(zip_command)
         commands.append(py_command)
     elif language == LANG_PHP:
-        command = ["/usr/bin/php5", executable_filename]
+        command = ["/usr/bin/php7.0", executable_filename]
         commands.append(command)
     elif language == LANG_JAVA:
-        command = ["/usr/local/jdk1.8.0_20/bin/java", "-Xmx%dM" % job.memory_limit, "-Xss64m", "-jar", executable_filename]
+        command = ["/usr/lib/jvm/java-8-openjdk-amd64/java", "-Xmx%dM" % job.memory_limit, "-Xss64m", "-jar", executable_filename]
         commands.append(command)
     elif language == LANG_CS:
-        command = ["/opt/mono/bin/mono", executable_filename]
+        command = ["/usr/bin/mono", executable_filename]
         commands.append(command)
     else:
         raise ValueError("Unknown language %s." % language)

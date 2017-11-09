@@ -405,7 +405,7 @@ class FileCacher(object):
 
         """
         self.service = service
-        path='/var/home/eio_team/filecache'
+        #path='/var/home/eio_team/filecache'
 
         if null:
             self.backend = NullBackend()
