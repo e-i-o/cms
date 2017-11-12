@@ -194,7 +194,7 @@ def get_evaluation_commands(language, executable_filename, job=None):
         command = ["/usr/bin/php7.0", executable_filename]
         commands.append(command)
     elif language == LANG_JAVA:
-        command = ["/usr/lib/jvm/java-8-openjdk-amd64/java", "-Xmx%dM" % job.memory_limit, "-Xss64m", "-jar", executable_filename]
+        command = ["/usr/lib/jvm/java-8-openjdk-amd64/bin/java", "-Xmx%dM" % job.memory_limit, "-Xss64m", "-jar", executable_filename]
         commands.append(command)
     elif language == LANG_CS:
         command = ["/usr/bin/mono", executable_filename]
