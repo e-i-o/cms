@@ -223,7 +223,7 @@ class Batch(TaskType):
         executable_filename = self.get_executable_filename(job.executables.keys()[0])
         language = job.language
         if job.language == LANG_JAVA: # Somewhy JVM will only work with 9 processes or more
-            sandbox.max_processes = 20
+            sandbox.max_processes = 50
         elif job.language == LANG_CS: # And C# needs at least 2
             sandbox.max_processes = 5
 
