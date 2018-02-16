@@ -612,7 +612,7 @@ var DataStore = new function () {
         var contest = self.contests[c_id];
 
         // Task
-        new_t_score = round(new_t_score, task["score_precision"]);
+	new_t_score = round(new_t_score, task["score_precision"]);
         var old_t_score = user["t_" + t_id];
         user["t_" + t_id] = new_t_score;
 
@@ -621,6 +621,19 @@ var DataStore = new function () {
         for (var i = 0; i < contest.tasks.length; i += 1) {
             new_c_score += user["t_" + contest.tasks[i].key];
         }
+	// ------------------------------------------------------------------- //
+	// BEGIN HACK This is a hackish remake, specific only for Eelvoor:
+	// Sum top 3 best scores only
+	var user_scores = [];
+        for (var i = 0; i < contest.tasks.length; i += 1) {
+            user_scores[i] = parseFloat(user["t_" + contest.tasks[i].key]);
+        }
+	user_scores.sort(function(a,b) { return b-a; });
+	new_c_score = 0.0;
+	for (var i = 0; i <= 2; i++) new_c_score += user_scores[i];
+	// END HACK
+	// ------------------------------------------------------------------- /
+	
         new_c_score = round(new_c_score, contest["score_precision"]);
         var old_c_score = user["c_" + c_id];
         user["c_" + c_id] = new_c_score;
