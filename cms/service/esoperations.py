@@ -148,13 +148,14 @@ def user_test_to_evaluate(user_test_result):
         r.evaluation_tries < MAX_USER_TEST_EVALUATION_TRIES
 
 
-def submission_get_operations(submission_result, submission, dataset):
+def submission_get_operations(submission_result, submission, dataset, archive_sandbox=False):
     """Generate all operations originating from a submission for a given
     dataset.
 
     submission_result (SubmissionResult|None): a submission result.
     submission (Submission): the submission for submission_result.
     dataset (Dataset): the dataset for submission_result.
+    archive_sandbox (boolean): whether to archive the sandbox.
 
     yield (ESOperation, int, datetime): an iterator providing triplets
         consisting of a ESOperation for a certain operation to
@@ -172,7 +173,8 @@ def submission_get_operations(submission_result, submission, dataset):
 
         yield ESOperation(ESOperation.COMPILATION,
                           submission.id,
-                          dataset.id), \
+                          dataset.id,
+                          archive_sandbox=archive_sandbox), \
             priority, \
             submission.timestamp
 
@@ -193,7 +195,8 @@ def submission_get_operations(submission_result, submission, dataset):
                 yield ESOperation(ESOperation.EVALUATION,
                                   submission.id,
                                   dataset.id,
-                                  testcase_codename), \
+                                  testcase_codename,
+                                  archive_sandbox=archive_sandbox), \
                     priority, \
                     submission.timestamp
 
@@ -497,18 +500,20 @@ class ESOperation(QueueItem):
     USER_TEST_EVALUATION = "evaluate_test"
 
     # Testcase codename is only needed for EVALUATION type of operation
-    def __init__(self, type_, object_id, dataset_id, testcase_codename=None):
+    def __init__(self, type_, object_id, dataset_id, testcase_codename=None, archive_sandbox=False):
         self.type_ = type_
         self.object_id = object_id
         self.dataset_id = dataset_id
         self.testcase_codename = testcase_codename
+        self.archive_sandbox = archive_sandbox
 
     @staticmethod
     def from_dict(d):
         return ESOperation(d["type"],
                            d["object_id"],
                            d["dataset_id"],
-                           d["testcase_codename"])
+                           d["testcase_codename"],
+                           d["archive_sandbox"])
 
     def __eq__(self, other):
         # We may receive a non-ESOperation other when comparing with
@@ -519,27 +524,29 @@ class ESOperation(QueueItem):
         return self.type_ == other.type_ \
             and self.object_id == other.object_id \
             and self.dataset_id == other.dataset_id \
-            and self.testcase_codename == other.testcase_codename
+            and self.testcase_codename == other.testcase_codename \
+            and self.archive_sandbox == other.archive_sandbox
 
     def __hash__(self):
         return hash((self.type_, self.object_id, self.dataset_id,
-                     self.testcase_codename))
+                     self.testcase_codename, self.archive_sandbox))
 
     def __str__(self):
         if self.type_ == ESOperation.EVALUATION:
-            return "%s on %d against dataset %d, testcase %s" % (
+            return "%s on %d against dataset %d, testcase %s, archiving sandbox %s" % (
                 self.type_, self.object_id, self.dataset_id,
-                self.testcase_codename)
+                self.testcase_codename, self.archive_sandbox)
         else:
-            return "%s on %d against dataset %d" % (
-                self.type_, self.object_id, self.dataset_id)
+            return "%s on %d against dataset %d, archiving sandbox %s" % (
+                self.type_, self.object_id, self.dataset_id, self.archive_sandbox)
 
     def __repr__(self):
-        return "(\"%s\", %s, %s, %s)" % (
+        return "(\"%s\", %s, %s, %s, %s)" % (
             self.type_,
             self.object_id,
             self.dataset_id,
-            self.testcase_codename)
+            self.testcase_codename,
+            self.archive_sandbox)
 
     def for_submission(self):
         """Return if the operation is for a submission or for a user test.
@@ -555,7 +562,8 @@ class ESOperation(QueueItem):
             "type": self.type_,
             "object_id": self.object_id,
             "dataset_id": self.dataset_id,
-            "testcase_codename": self.testcase_codename
+            "testcase_codename": self.testcase_codename,
+            "archive_sandbox": self.archive_sandbox
         }
 
     def short_key(self):
