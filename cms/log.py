@@ -1,11 +1,12 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2010-2013 Giovanni Mascellani <mascellani@poisson.phc.unipi.it>
-# Copyright © 2010-2012 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2010-2016 Stefano Maggiolo <s.maggiolo@gmail.com>
 # Copyright © 2010-2012 Matteo Boscariol <boscarim@hotmail.com>
 # Copyright © 2013 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2015 Luca Versari <veluca93@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -44,14 +45,18 @@
 # http://hg.python.org/cpython/file/69ee9b554eca/Lib/logging/handlers.py
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
-import curses
 import logging
 import sys
 
-import gevent.coros
+import gevent.lock
+
+from cmscommon.terminal import colors, add_color_to_string, has_color_support
 
 
 class StreamHandler(logging.StreamHandler):
@@ -65,7 +70,7 @@ class StreamHandler(logging.StreamHandler):
         """Set self.lock to a new gevent RLock.
 
         """
-        self.lock = gevent.coros.RLock()
+        self.lock = gevent.lock.RLock()
 
 
 class FileHandler(logging.FileHandler):
@@ -79,7 +84,7 @@ class FileHandler(logging.FileHandler):
         """Set self.lock to a new gevent RLock.
 
         """
-        self.lock = gevent.coros.RLock()
+        self.lock = gevent.lock.RLock()
 
 
 class LogServiceHandler(logging.Handler):
@@ -117,7 +122,7 @@ class LogServiceHandler(logging.Handler):
         """Set self.lock to a new gevent RLock.
 
         """
-        self.lock = gevent.coros.RLock()
+        self.lock = gevent.lock.RLock()
 
     # Taken from CPython, combining emit and makePickle, and adapted to
     # not pickle the dictionary and use its items as keyword parameters
@@ -144,72 +149,27 @@ class LogServiceHandler(logging.Handler):
             self.handleError(record)
 
 
-def has_color_support(stream):
-    """Try to determine if the given stream supports colored output.
-
-    Return True only if the stream declares to be a TTY, if it has a
-    file descriptor on which ncurses can initialize a terminal and if
-    that terminal's entry in terminfo declares support for colors.
-
-    stream (fileobj): a file-like object (that adheres to the API
-        declared in the `io' package).
-
-    return (bool): True if we're sure that colors are supported, False
-        if they aren't or if we can't tell.
-
-    """
-    if stream.isatty():
-        try:
-            curses.setupterm(fd=stream.fileno())
-            # See `man terminfo` for capabilities' names and meanings.
-            if curses.tigetnum("colors") > 0:
-                return True
-        # fileno() can raise IOError or OSError (since Python 3.3).
-        except Exception:
-            pass
-    return False
-
-
 def get_color_hash(string):
     """Deterministically return a color based on the string's content.
 
-    Determine one of curses.COLOR_* using only the data of the given
-    string. The only condition is for the operation to give the same
-    result when repeated.
+    Determine one of colors.* using only the data of the given string.
+    The only condition is for the operation to give the same result when
+    repeated.
 
     string (string): the string.
 
-    return (int): a color, as a curses.COLOR_* constant..
+    return (int): a color, as a colors.* constant.
 
     """
     # We get the default hash of the string and use it to pick a color.
-    return [curses.COLOR_BLACK,
-            curses.COLOR_RED,
-            curses.COLOR_GREEN,
-            curses.COLOR_YELLOW,
-            curses.COLOR_BLUE,
-            curses.COLOR_MAGENTA,
-            curses.COLOR_CYAN,
-            curses.COLOR_WHITE][hash(string) % 8]
-
-
-def add_color_to_string(string, color):
-    """Format the string to be printed with the given color.
-
-    Insert formatting characters that, when printed on a terminal, will
-    make the given string appear with the given foreground color.
-
-    string (string): the string to color.
-    color (int): the color as a curses constant, like
-        curses.COLOR_BLACK.
-
-    return (string): the formatted string.
-
-    """
-    # See `man terminfo` for capabilities' names and meanings.
-    return "%s%s%s%s" % (curses.tparm(curses.tigetstr("setaf"), color),
-                         curses.tparm(curses.tigetstr("bold")), string,
-                         curses.tparm(curses.tigetstr("sgr0")))
+    return [colors.BLACK,
+            colors.RED,
+            colors.GREEN,
+            colors.YELLOW,
+            colors.BLUE,
+            colors.MAGENTA,
+            colors.CYAN,
+            colors.WHITE][hash(string) % 8]
 
 
 class CustomFormatter(logging.Formatter):
@@ -228,11 +188,11 @@ class CustomFormatter(logging.Formatter):
     (this cannot be done with the standard formatter!).
 
     """
-    SEVERITY_COLORS = {logging.CRITICAL: curses.COLOR_RED,
-                       logging.ERROR: curses.COLOR_RED,
-                       logging.WARNING: curses.COLOR_YELLOW,
-                       logging.INFO: curses.COLOR_GREEN,
-                       logging.DEBUG: curses.COLOR_CYAN}
+    SEVERITY_COLORS = {logging.CRITICAL: colors.RED,
+                       logging.ERROR: colors.RED,
+                       logging.WARNING: colors.YELLOW,
+                       logging.INFO: colors.GREEN,
+                       logging.DEBUG: colors.CYAN}
 
     def __init__(self, colors=False):
         """Initialize a formatter.
@@ -241,7 +201,7 @@ class CustomFormatter(logging.Formatter):
             not.
 
         """
-        logging.Formatter.__init__(self, "", "%Y/%m/%d %H:%M:%S")
+        logging.Formatter.__init__(self, "")
         self.colors = colors
 
     # Taken from CPython and adapted to remove assumptions that there
@@ -286,39 +246,83 @@ class CustomFormatter(logging.Formatter):
         return (string): the formatted log message.
 
         """
-        # Determine the first part (time and severity) and its color.
-        severity_str = record.asctime + " - " + record.levelname
-        severity_col = self.SEVERITY_COLORS[record.levelno]
+        severity = self.get_severity(record)
+        coordinates = self.get_coordinates(record)
+        operation = self.get_operation(record)
+        message = record.message
+        if self.colors:
+            severity_col = self.SEVERITY_COLORS[record.levelno]
+            severity = add_color_to_string(severity, severity_col,
+                                           bold=True, force=True)
+            coordinates_col = get_color_hash(coordinates)
+            if len(coordinates) > 0:
+                coordinates = add_color_to_string(coordinates, coordinates_col,
+                                                  bold=True, force=True)
+            operation_col = get_color_hash(operation)
+            if len(operation) > 0:
+                operation = add_color_to_string(operation, operation_col,
+                                                bold=True, force=True)
 
-        # Determine the second part (service coords) and its color.
+        fmt = severity
+        if coordinates.strip() != "":
+            fmt += " [%s]" % (coordinates.strip())
+        if operation.strip() != "":
+            fmt += " [%s]" % (operation.strip())
+        fmt += " %s" % message
+        return fmt
+
+    def get_severity(self, record):
+        """Return the severity part of the log for the given record."""
+        severity = record.asctime + " - " + record.levelname
+        return severity
+
+    def get_coordinates(self, record):
+        """Return the coordinates part of the log for the given record.
+
+        It contains information on what originates the log. For the
+        non detailed log, it only contains service coordinates.
+
+        """
         if hasattr(record, "service_name") and \
                 hasattr(record, "service_shard"):
-            coord_str = "%s,%d" % (record.service_name, record.service_shard)
+            service = record.service_name\
+                .replace("Service", "").replace("WebServer", "")
+            coordinates = "%s,%d" % (service, record.service_shard)
         else:
-            coord_str = "None"
-        coord_col = get_color_hash(coord_str)
+            coordinates = "<unknown>"
+        return coordinates
 
-        # Determine the third part (operation) and its color.
-        if hasattr(record, "operation"):
-            operation_str = record.operation
-        else:
-            operation_str = ""
-        operation_col = get_color_hash(operation_str)
+    def get_operation(self, record):
+        """Return the operation part of the log for the given record.
 
-        # Colorize the strings.
-        if self.colors:
-            severity_str = add_color_to_string(severity_str, severity_col)
-            coord_str = add_color_to_string(coord_str, coord_col)
-            operation_str = add_color_to_string(operation_str, operation_col)
+        The operation is a string explicitly passed in the logger call.
 
-        # Put them all together.
-        fmt = severity_str
-        fmt += " [" + coord_str
-        if hasattr(record, "operation"):
-            fmt += "/" + operation_str
-        fmt += "] " + record.message
+        """
+        return record.operation if hasattr(record, "operation") else ""
 
-        return fmt
+
+class DetailedFormatter(CustomFormatter):
+    """A version of custom formatter showing more information."""
+
+    def get_coordinates(self, record):
+        """See CustomFormatter.get_coordinates
+
+        The detailed log contains the service coordinate, the thread
+        name, file and function name, in addition to the operation, if
+        present.
+
+        """
+        coordinates = super(DetailedFormatter, self).get_coordinates(record)
+
+        # Thread name, trying to shorten it removing useless values.
+        coordinates += " %s" % (
+            record.threadName.replace("Thread", "").replace("Dummy-", ""))
+
+        # File and function name.
+        coordinates += " %s::%s" % (
+            record.filename.replace(".py", ""), record.funcName)
+
+        return coordinates
 
 
 class ServiceFilter(logging.Filter):
@@ -395,8 +399,18 @@ class OperationAdapter(logging.LoggerAdapter):
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.DEBUG)
 
+
 # Install a shell handler.
 shell_handler = StreamHandler(sys.stdout)
 shell_handler.setLevel(logging.INFO)
 shell_handler.setFormatter(CustomFormatter(has_color_support(sys.stdout)))
 root_logger.addHandler(shell_handler)
+
+
+def set_detailed_logs(detailed):
+    """Set or unset the shell logs to detailed."""
+    global shell_handler
+    color = has_color_support(sys.stdout)
+    formatter = DetailedFormatter(color) \
+        if detailed else CustomFormatter(color)
+    shell_handler.setFormatter(formatter)

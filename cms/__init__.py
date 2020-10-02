@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
@@ -21,8 +21,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
 # As this package initialization code is run by all code that imports
 # something in cms.* it's the best place to setup the logging handlers.
@@ -34,78 +37,46 @@ import cms.log
 # Define what this package will provide.
 
 __all__ = [
-    "LANG_C", "LANG_CPP", "LANG_PASCAL", "LANG_PYTHON", "LANG_PHP",
-    "LANGUAGE_NAMES", "LANGUAGES", "DEFAULT_LANGUAGES",
-    "SOURCE_EXT_TO_LANGUAGE_MAP",
-    "LANGUAGE_TO_SOURCE_EXT_MAP", "LANGUAGE_TO_HEADER_EXT_MAP",
+    "__version__",
+    "SCORE_MODE_MAX", "SCORE_MODE_MAX_TOKENED_LAST", "TOKEN_MODE_DISABLED",
+    "TOKEN_MODE_FINITE", "TOKEN_MODE_INFINITE", "TOKEN_MODE_MIXED",
     # log
     # Nothing intended for external use, no need to advertise anything.
-    # util
-    "ConfigError", "mkdir", "utf8_decoder", "Address", "ServiceCoord",
-    "get_safe_shard", "get_service_address", "get_service_shards",
-    "default_argument_parser",
     # conf
-    "config",
+    "Address", "ServiceCoord", "ConfigError", "async_config", "config",
+    # util
+    "mkdir", "rmtree", "utf8_decoder", "get_safe_shard", "get_service_address",
+    "get_service_shards", "contest_id_from_args", "default_argument_parser",
     # plugin
-    "plugin_list", "plugin_lookup",
+    "plugin_list",
 ]
+
+
+__version__ = '1.4.dev0'
 
 
 # Instantiate or import these objects.
 
-# Shorthand codes for all supported languages.
-LANG_C = "c"
-LANG_CPP = "cpp"
-LANG_PASCAL = "pas"
-LANG_PYTHON = "py"
-LANG_PHP = "php"
-LANG_JAVA = "java"
 
-LANGUAGE_NAMES = {
-    LANG_C: "C",
-    LANG_CPP: "C++",
-    LANG_PASCAL: "Pascal",
-    LANG_PYTHON: "Python",
-    LANG_PHP: "PHP",
-    LANG_JAVA: "Java",
-}
+# Task score modes.
 
-LANGUAGES = [LANG_C, LANG_CPP, LANG_PASCAL, LANG_PYTHON, LANG_PHP, LANG_JAVA]
-DEFAULT_LANGUAGES = [LANG_C, LANG_CPP, LANG_PASCAL]
+# Maximum score amongst all submissions.
+SCORE_MODE_MAX = "max"
+# Maximum score among all tokened submissions and the last submission.
+SCORE_MODE_MAX_TOKENED_LAST = "max_tokened_last"
 
-# A reference for extension-based automatic language detection.
-# (It's more difficult with headers because ".h" is ambiguous.)
-SOURCE_EXT_TO_LANGUAGE_MAP = {
-    ".c": LANG_C,
-    ".cpp": LANG_CPP,
-    ".cxx": LANG_CPP,
-    ".cc": LANG_CPP,
-    ".C": LANG_CPP,
-    ".c++": LANG_CPP,
-    ".pas": LANG_PASCAL,
-    ".py": LANG_PYTHON,
-    ".php": LANG_PHP,
-    ".java": LANG_JAVA,
-}
+# Token modes.
 
-# Our preferred source file and header file extension for each language.
-LANGUAGE_TO_SOURCE_EXT_MAP = {
-    LANG_C: ".c",
-    LANG_CPP: ".cpp",
-    LANG_PASCAL: ".pas",
-    LANG_PYTHON: ".py",
-    LANG_PHP: ".php",
-    LANG_JAVA: ".java",
-}
-LANGUAGE_TO_HEADER_EXT_MAP = {
-    LANG_C: ".h",
-    LANG_CPP: ".h",
-    LANG_PASCAL: "lib.pas",
-}
+TOKEN_MODE_DISABLED = "disabled"
+TOKEN_MODE_FINITE = "finite"
+TOKEN_MODE_INFINITE = "infinite"
+# Only used when aggregating modes (e.g., for all tasks of a contest).
+# Acts as a "none of the above".
+TOKEN_MODE_MIXED = "mixed"
 
 
-from .util import ConfigError, mkdir, utf8_decoder, Address, ServiceCoord, \
-    get_safe_shard, get_service_address, get_service_shards, \
+from .conf import Address, ServiceCoord, ConfigError, async_config, config
+from .util import mkdir, rmtree, utf8_decoder, get_safe_shard, \
+    get_service_address, get_service_shards, contest_id_from_args, \
     default_argument_parser
-from .conf import config
-from .plugin import plugin_list, plugin_lookup
+from .plugin import plugin_list

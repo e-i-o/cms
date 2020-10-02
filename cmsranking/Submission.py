@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
@@ -18,14 +18,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
-
-import six
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
 from cmsranking.Entity import Entity, InvalidData
-from cmsranking.Store import Store
-from cmsranking.Subchange import store as subchange_store
 
 
 class Submission(Entity):
@@ -56,11 +55,11 @@ class Submission(Entity):
         try:
             assert isinstance(data, dict), \
                 "Not a dictionary"
-            assert isinstance(data['user'], six.text_type), \
+            assert isinstance(data['user'], str), \
                 "Field 'user' isn't a string"
-            assert isinstance(data['task'], six.text_type), \
+            assert isinstance(data['task'], str), \
                 "Field 'task' isn't a string"
-            assert isinstance(data['time'], six.integer_types), \
+            assert isinstance(data['time'], int), \
                 "Field 'time' isn't an integer (unix timestamp)"
         except KeyError as exc:
             raise InvalidData("Field %s is missing" % exc.message)
@@ -81,10 +80,6 @@ class Submission(Entity):
         del result['extra']
         return result
 
-    def consistent(self):
-        from cmsranking.Task import store as task_store
-        from cmsranking.User import store as user_store
-        return self.task in task_store and self.user in user_store
-
-
-store = Store(Submission, 'submissions', [subchange_store])
+    def consistent(self, stores):
+        return ("task" not in stores or self.task in stores["task"]) \
+               and ("user" not in stores or self.user in stores["user"])

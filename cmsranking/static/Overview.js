@@ -89,6 +89,17 @@ var Overview = new function () {
         $elem.mouseleave(function () {
             set.animate({"opacity": 0}, 1000);
         });
+
+
+        // Load initial data.
+        $.each(DataStore.users, function (u_id, user) {
+            if (user["selected"] > 0)
+            {
+                self.user_list.push(user);
+            }
+        });
+        self.user_list.sort(self.compare_users);
+        self.update_markers(0);
     };
 
 
@@ -252,7 +263,7 @@ var Overview = new function () {
 
     self.MARKER_PADDING = 2;
     self.MARKER_RADIUS = 2.5;
-    self.MARKER_LABEL_WIDTH = 30;
+    self.MARKER_LABEL_WIDTH = 50;
     self.MARKER_LABEL_HEIGHT = 20;
     self.MARKER_ARROW_WIDTH = 20;
     self.MARKER_STROKE_WIDTH = 2;
@@ -335,7 +346,7 @@ var Overview = new function () {
         // Place the text inside the label, with a padding-right equal to its
         // padding-top and padding-bottom.
         var t_x = self.width - self.PAD_R - self.MARKER_ARROW_WIDTH - (self.MARKER_LABEL_HEIGHT - 12) / 2;
-        self.paper.text(t_x, u_h, user["key"]).attr({
+        self.paper.text(t_x, u_h, self.transform_key(user)).attr({
             "fill": "#ffffff",
             "stroke": "none",
             "font-family": "sans-serif",
@@ -351,10 +362,26 @@ var Overview = new function () {
 
         user["markers"] = set;
 
-        user["marker_c_anim"] = Raphael.animation({"opacity": 1}, 1000, function () {
+        user["marker_c_anim"] = Raphael.animation({"opacity": 1}, t, function () {
             delete user["marker_c_anim"];
         });
         set.animate(user["marker_c_anim"]);
+    };
+
+    self.transform_key = function(user) {
+      var s = user['f_name'] + ' ' + user['l_name'];
+      var sl = s.split(' ');
+      var out = '';
+      for (var i = 0; i < sl.length; i++) {
+          if (sl[i].length > 0) {
+              out += sl[i][0];
+          }
+      }
+      if (user["team"] != null && user["team"] != undefined) {
+          return user['team'] + '-' + out;
+      } else {
+          return out;
+      }
     };
 
 
@@ -376,7 +403,7 @@ var Overview = new function () {
     };
 
 
-    self.delete_marker = function (user) {
+    self.delete_marker = function (user, t) {
         var markers = user["markers"];
         delete user["markers"];
 
@@ -386,22 +413,28 @@ var Overview = new function () {
             delete user["marker_u_anim"];
         }
 
-        var anim = Raphael.animation({"opacity": 0}, 1000, function () {
+        var anim = Raphael.animation({"opacity": 0}, t, function () {
             markers.remove();
         });
         markers.animate(anim);
 
         self.user_list.splice($.inArray(user, self.user_list), 1);
-        self.update_markers(1000);
+        self.update_markers(t);
     };
 
 
     self.get_score_height = function (score, max_score) {
+        if (max_score <= 0) {
+            return self.height - self.PAD_B;
+        }
         return self.height - self.PAD_B - score / max_score * (self.height - self.PAD_T - self.PAD_B);
     };
 
 
     self.get_rank_height = function (rank, max_rank) {
+        if (max_rank <= 1) {
+            return self.PAD_T;
+        }
         return self.PAD_T + (rank - 1) / (max_rank - 1) * (self.height - self.PAD_T - self.PAD_B);
     };
 
@@ -513,7 +546,7 @@ var Overview = new function () {
 
         self.update_score_chart(1000);
 
-        if (user["selected"]) {
+        if (user["selected"] > 0) {
             self.user_list.sort(self.compare_users);
             self.update_markers(1000);
         }
@@ -521,7 +554,7 @@ var Overview = new function () {
 
 
     self.rank_handler = function (u_id, user, delta) {
-        if (user["selected"]) {
+        if (user["selected"] > 0) {
             self.update_markers(1000);
         }
     };
@@ -529,12 +562,12 @@ var Overview = new function () {
 
     self.select_handler = function (u_id, color) {
         var user = DataStore.users[u_id];
-        if (color) {
+        if (color > 0) {
             self.user_list.push(user);
             self.user_list.sort(self.compare_users);
             self.update_markers(1000);
         } else {
-            self.delete_marker(DataStore.users[u_id]);
+            self.delete_marker(DataStore.users[u_id], 1000);
         }
     };
 

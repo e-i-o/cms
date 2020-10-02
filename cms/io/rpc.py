@@ -1,11 +1,11 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2010-2013 Giovanni Mascellani <mascellani@poisson.phc.unipi.it>
-# Copyright © 2010-2014 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2010-2015 Stefano Maggiolo <s.maggiolo@gmail.com>
 # Copyright © 2010-2012 Matteo Boscariol <boscarim@hotmail.com>
-# Copyright © 2013 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2013-2017 Luca Wehrstedt <luca.wehrstedt@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -21,8 +21,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
+from six import iterkeys, itervalues
 
 import functools
 import json
@@ -33,7 +37,7 @@ import uuid
 from weakref import WeakSet
 
 import gevent
-import gevent.coros
+import gevent.lock
 import gevent.socket
 import gevent.event
 
@@ -95,6 +99,13 @@ class RemoteServiceBase(object):
         self._on_connect_handlers = list()
         self._on_disconnect_handlers = list()
 
+        self._socket = None
+        self._reader = None
+        self._writer = None
+
+        self._read_lock = gevent.lock.RLock()
+        self._write_lock = gevent.lock.RLock()
+
     def add_on_connect_handler(self, handler):
         """Register a callback for connection establishment.
 
@@ -139,8 +150,6 @@ class RemoteServiceBase(object):
         self._socket = sock
         self._reader = self._socket.makefile('rb')
         self._writer = self._socket.makefile('wb')
-        self._read_lock = gevent.coros.RLock()
-        self._write_lock = gevent.coros.RLock()
         self.connected = True
 
         logger.info("Established connection with %s.", self._repr_remote())
@@ -151,8 +160,8 @@ class RemoteServiceBase(object):
     def finalize(self, reason=""):
         """Deactivate the communication on the current socket.
 
-        Remove all I/O related attributes and take the class back to
-        the disconnected state. Call the on_disconnect callback.
+        Take the class back to the disconnected state and call the
+        on_disconnect callback.
 
         reason (unicode): the human-readable reason for closing the
             connection, to be put in log messages and exceptions.
@@ -161,11 +170,9 @@ class RemoteServiceBase(object):
         if not self.connected:
             return
 
-        self.__dict__.pop("_socket", None)
-        self.__dict__.pop("_reader", None)
-        self.__dict__.pop("_writer", None)
-        self.__dict__.pop("_read_lock", None)
-        self.__dict__.pop("_write_lock", None)
+        self._socket = None
+        self._reader = None
+        self._writer = None
         self.connected = False
 
         logger.info("Terminated connection with %s: %s", self._repr_remote(),
@@ -177,18 +184,21 @@ class RemoteServiceBase(object):
     def disconnect(self):
         """Gracefully close the connection.
 
+        return (bool): True if the service was connected.
+
         """
         if not self.connected:
-            return
+            return False
 
         try:
             self._socket.shutdown(socket.SHUT_RDWR)
             self._socket.close()
         except socket.error as error:
-            logger.debug("Couldn't disconnect from %s: %s.",
-                         self._repr_remote(), error)
+            logger.warning("Couldn't disconnect from %s: %s.",
+                           self._repr_remote(), error)
         finally:
             self.finalize("Disconnection requested.")
+        return True
 
     def _read(self):
         """Receive a message from the socket.
@@ -256,8 +266,8 @@ class RemoteServiceBase(object):
                 self._writer.write(data + b'\r\n')
                 self._writer.flush()
         except socket.error as error:
-            logger.warning("Failed writing to socket: %s.", error)
             self.finalize("Write failed.")
+            logger.warning("Failed writing to socket: %s.", error)
             raise error
 
 
@@ -296,7 +306,7 @@ class RemoteServiceServer(RemoteServiceBase):
 
     def handle(self, socket_):
         self.initialize(socket_, self.remote_address)
-        gevent.spawn(self.run)
+        self.run()
 
     def run(self):
         """Start listening for requests, and go on forever.
@@ -330,7 +340,7 @@ class RemoteServiceServer(RemoteServiceBase):
         """
         # Decode the incoming data.
         try:
-            message = json.loads(data, encoding='utf-8')
+            message = json.loads(data.decode('utf-8'))
         except ValueError:
             logger.warning("Cannot parse incoming message, discarding.")
             return
@@ -347,7 +357,7 @@ class RemoteServiceServer(RemoteServiceBase):
 
         """
         # Validate the request.
-        if not {"__id", "__method", "__data"}.issubset(request.iterkeys()):
+        if not {"__id", "__method", "__data"}.issubset(iterkeys(request)):
             logger.warning("Request is missing some fields, ingoring.")
             return
 
@@ -381,9 +391,9 @@ class RemoteServiceServer(RemoteServiceBase):
 
         # Encode it.
         try:
-            data = json.dumps(response, encoding='utf-8')
+            data = json.dumps(response).encode('utf-8')
         except (TypeError, ValueError):
-            logger.warning("JSON encoding failed.")
+            logger.warning("JSON encoding failed.", exc_info=True)
             return
 
         # Send it.
@@ -431,6 +441,8 @@ class RemoteServiceClient(RemoteServiceBase):
 
         self.auto_retry = auto_retry
 
+        self._loop = None
+
     def _repr_remote(self):
         """See RemoteServiceBase._repr_remote."""
         return "%s:%d (%r)" % (self.remote_address +
@@ -440,7 +452,7 @@ class RemoteServiceClient(RemoteServiceBase):
         """See RemoteServiceBase.finalize."""
         super(RemoteServiceClient, self).finalize(reason)
 
-        for result in self.pending_outgoing_requests_results.itervalues():
+        for result in itervalues(self.pending_outgoing_requests_results):
             result.set_exception(RPCError(reason))
 
         self.pending_outgoing_requests.clear()
@@ -483,8 +495,9 @@ class RemoteServiceClient(RemoteServiceBase):
 
     def disconnect(self):
         """See RemoteServiceBase.disconnect."""
-        super(RemoteServiceClient, self).disconnect()
-        self._loop.kill()
+        if super(RemoteServiceClient, self).disconnect():
+            self._loop.kill()
+            self._loop = None
 
     def run(self):
         """Start listening for responses, and go on forever.
@@ -518,7 +531,7 @@ class RemoteServiceClient(RemoteServiceBase):
         """
         # Decode the incoming data.
         try:
-            message = json.loads(data, encoding='utf-8')
+            message = json.loads(data.decode('utf-8'))
         except ValueError:
             logger.warning("Cannot parse incoming message, discarding.")
             return
@@ -535,7 +548,7 @@ class RemoteServiceClient(RemoteServiceBase):
 
         """
         # Validate the response.
-        if not {"__id", "__data", "__error"}.issubset(response.iterkeys()):
+        if not {"__id", "__data", "__error"}.issubset(iterkeys(response)):
             logger.warning("Response is missing some fields, ingoring.")
             return
 
@@ -581,8 +594,9 @@ class RemoteServiceClient(RemoteServiceBase):
 
         # Encode it.
         try:
-            data = json.dumps(request, encoding='utf-8')
+            data = json.dumps(request).encode('utf-8')
         except (TypeError, ValueError):
+            logger.error("JSON encoding failed.", exc_info=True)
             result.set_exception(RPCError("JSON encoding failed."))
             return result
 
@@ -689,7 +703,7 @@ class FakeRemoteServiceClient(RemoteServiceClient):
 
     def disconnect(self):
         """Do nothing, as this is a fake client."""
-        pass
+        return True
 
     def execute_rpc(self, method, data):
         """Just return an AsyncResult encoding an error."""

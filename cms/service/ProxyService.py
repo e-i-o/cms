@@ -1,12 +1,15 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2010-2013 Giovanni Mascellani <mascellani@poisson.phc.unipi.it>
-# Copyright © 2010-2014 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2010-2015 Stefano Maggiolo <s.maggiolo@gmail.com>
 # Copyright © 2010-2012 Matteo Boscariol <boscarim@hotmail.com>
-# Copyright © 2013 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2013-2018 Luca Wehrstedt <luca.wehrstedt@gmail.com>
 # Copyright © 2013 Bernard Blackham <bernard@largestprime.net>
+# Copyright © 2015 Luca Versari <veluca93@gmail.com>
+# Copyright © 2015 William Di Luigi <williamdiluigi@gmail.com>
+# Copyright © 2016 Amir Keivan Mohtashami <akmohtashami97@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -26,24 +29,27 @@
 """
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
 import json
 import logging
 import string
+from future.moves.urllib.parse import urljoin, urlsplit
 
 import gevent
 import gevent.queue
-
 import requests
 import requests.exceptions
-from urlparse import urljoin, urlsplit
+from sqlalchemy import not_
 
 from cms import config
 from cms.io import Executor, QueueItem, TriggeredService, rpc_method
-from cms.db import SessionGen, Contest, Task, Submission
-from cms.grading.scoretypes import get_score_type
+from cms.db import SessionGen, Contest, Participation, Task, Submission, \
+    get_submissions
 from cmscommon.datetime import make_timestamp
 
 
@@ -62,11 +68,11 @@ def encode_id(entity_id):
 
     """
     encoded_id = ""
-    for char in entity_id.encode('utf-8'):
+    for char in entity_id:
         if char not in string.ascii_letters + string.digits:
             encoded_id += "_%x" % ord(char)
         else:
-            encoded_id += unicode(char)
+            encoded_id += char
     return encoded_id
 
 
@@ -87,7 +93,7 @@ def safe_put_data(ranking, resource, data, operation):
         # XXX With requests-1.2 auth is automatically extracted from
         # the URL: there is no need for this.
         auth = urlsplit(url)
-        res = requests.put(url, json.dumps(data, encoding="utf-8"),
+        res = requests.put(url, json.dumps(data),
                            auth=(auth.username, auth.password),
                            headers={'content-type': 'application/json'},
                            verify=config.https_certfile)
@@ -142,12 +148,12 @@ class ProxyExecutor(Executor):
     # The resource paths for the different entity types, relative to
     # the self.ranking URL.
     RESOURCE_PATHS = [
-        b"contests",
-        b"tasks",
-        b"teams",
-        b"users",
-        b"submissions",
-        b"subchanges"]
+        "contests",
+        "tasks",
+        "teams",
+        "users",
+        "submissions",
+        "subchanges"]
 
     # How many different entity types we know about.
     TYPE_COUNT = len(RESOURCE_PATHS)
@@ -188,13 +194,13 @@ class ProxyExecutor(Executor):
         """
         # The cumulative data that we will try to send to the ranking,
         # built by combining items in the queue.
-        data = list(dict() for i in xrange(self.TYPE_COUNT))
+        data = list(dict() for i in range(self.TYPE_COUNT))
 
         for entry in entries:
             data[entry.item.type_].update(entry.item.data)
 
         try:
-            for i in xrange(self.TYPE_COUNT):
+            for i in range(self.TYPE_COUNT):
                 # Send entities of type i.
                 if len(data[i]) > 0:
                     # We abuse the resource path as the English
@@ -205,7 +211,7 @@ class ProxyExecutor(Executor):
 
                     logger.debug(operation.capitalize())
                     safe_put_data(
-                        self._ranking, b"%s/" % name, data[i], operation)
+                        self._ranking, "%s/" % name, data[i], operation)
                     data[i].clear()
 
         except CannotSendError:
@@ -225,13 +231,12 @@ class ProxyService(TriggeredService):
     them to the rankings by putting them in the queues of the proxies.
 
     The "entry points" are submission_score, submission_tokened,
-    dataset_updated and search_jobs_not_done. They can all be called
-    via RPC and the latter is also periodically executed (each
-    JOBS_NOT_DONE_CHECK_TIME). These methods fetch objects from the
-    database, check their validity (existence, non-hiddenness, etc.)
-    and status and, if needed, put call initialize, send_score and
-    send_token that construct the data to send to rankings and put it
-    in the queues of all proxies.
+    dataset_updated (and search_operations_not_done, from triggered
+    service, which is also periodically executed). These methods fetch
+    objects from the database, check their validity (existence,
+    non-hiddenness, etc.)  and status and, if needed, put call
+    initialize, send_score and send_token that construct the data to
+    send to rankings and put it in the queues of all proxies.
 
     """
 
@@ -261,13 +266,15 @@ class ProxyService(TriggeredService):
         # Create one executor for each ranking.
         self.rankings = list()
         for ranking in config.rankings:
-            self.add_executor(ProxyExecutor(ranking.encode('utf-8')))
+            self.add_executor(ProxyExecutor(ranking))
 
-        # Send some initial data to rankings.
+        # Enqueue the dispatch of some initial data to rankings. Needs
+        # to be done before the sweeper is started, as otherwise RWS
+        # might receive submissions before the corresponding task, for
+        # example.
         self.initialize()
 
-    def _sweeper_timeout(self):
-        return 347.0
+        self.start_sweeper(347.0)
 
     def _missing_operations(self):
         """Return a generator of data to be sent to the rankings..
@@ -275,13 +282,18 @@ class ProxyService(TriggeredService):
         """
         counter = 0
         with SessionGen() as session:
-            contest = Contest.get_from_id(self.contest_id, session)
+            submissions = get_submissions(session, contest_id=self.contest_id) \
+                .filter(not_(Participation.hidden)) \
+                .filter(Submission.official).all()
 
-            for submission in contest.get_submissions():
-                if submission.user.hidden:
+            for submission in submissions:
+                # The submission result can be None if the dataset has
+                # been just made live.
+                sr = submission.get_result()
+                if sr is None:
                     continue
 
-                if submission.get_result().scored() and \
+                if sr.scored() and \
                         submission.id not in self.scores_sent_to_rankings:
                     for operation in self.operations_for_score(submission):
                         self.enqueue(operation)
@@ -323,29 +335,40 @@ class ProxyService(TriggeredService):
                 "score_precision": contest.score_precision}
 
             users = dict()
+            teams = dict()
 
-            for user in contest.users:
-                if not user.hidden:
-                    users[encode_id(user.username)] = \
-                        {"f_name": user.first_name,
-                         "l_name": user.last_name,
-                         "team": None}
+            for participation in contest.participations:
+                user = participation.user
+                team = participation.team
+                if not participation.hidden:
+                    users[encode_id(user.username)] = {
+                        "f_name": user.first_name,
+                        "l_name": user.last_name,
+                        "team": team.code if team is not None else None,
+                    }
+                    if team is not None:
+                        teams[encode_id(team.code)] = {
+                            "name": team.name
+                        }
 
             tasks = dict()
 
             for task in contest.tasks:
-                score_type = get_score_type(dataset=task.active_dataset)
-                tasks[encode_id(task.name)] = \
-                    {"short_name": task.name,
-                     "name": task.title,
-                     "contest": encode_id(contest.name),
-                     "order": task.num,
-                     "max_score": score_type.max_score,
-                     "extra_headers": score_type.ranking_headers,
-                     "score_precision": task.score_precision}
+                score_type = task.active_dataset.score_type_object
+                tasks[encode_id(task.name)] = {
+                    "short_name": task.name,
+                    "name": task.title,
+                    "contest": encode_id(contest.name),
+                    "order": task.num,
+                    "max_score": score_type.max_score,
+                    "extra_headers": score_type.ranking_headers,
+                    "score_precision": task.score_precision,
+                    "score_mode": task.score_mode,
+                }
 
         self.enqueue(ProxyOperation(ProxyExecutor.CONTEST_TYPE,
                                     {contest_id: contest_data}))
+        self.enqueue(ProxyOperation(ProxyExecutor.TEAM_TYPE, teams))
         self.enqueue(ProxyOperation(ProxyExecutor.USER_TYPE, users))
         self.enqueue(ProxyOperation(ProxyExecutor.TASK_TYPE, tasks))
 
@@ -361,7 +384,7 @@ class ProxyService(TriggeredService):
         # Data to send to remote rankings.
         submission_id = "%d" % submission.id
         submission_data = {
-            "user": encode_id(submission.user.username),
+            "user": encode_id(submission.participation.user.username),
             "task": encode_id(submission.task.name),
             "time": int(make_timestamp(submission.timestamp))}
 
@@ -375,8 +398,7 @@ class ProxyService(TriggeredService):
         if submission_result is not None and submission_result.scored():
             # We're sending the unrounded score to RWS
             subchange_data["score"] = submission_result.score
-            subchange_data["extra"] = \
-                json.loads(submission_result.ranking_score_details)
+            subchange_data["extra"] = submission_result.ranking_score_details
 
         self.scores_sent_to_rankings.add(submission.id)
 
@@ -396,7 +418,7 @@ class ProxyService(TriggeredService):
         # Data to send to remote rankings.
         submission_id = "%d" % submission.id
         submission_data = {
-            "user": encode_id(submission.user.username),
+            "user": encode_id(submission.participation.user.username),
             "task": encode_id(submission.task.name),
             "time": int(make_timestamp(submission.timestamp))}
 
@@ -447,9 +469,16 @@ class ProxyService(TriggeredService):
                              "unexistent submission id %s.", submission_id)
                 raise KeyError("Submission not found.")
 
-            if submission.user.hidden:
+            if submission.participation.hidden:
                 logger.info("[submission_scored] Score for submission %d "
-                            "not sent because user is hidden.", submission_id)
+                            "not sent because the participation is hidden.",
+                            submission_id)
+                return
+
+            if not submission.official:
+                logger.info("[submission_scored] Score for submission %d "
+                            "not sent because the submission is not official.",
+                            submission_id)
                 return
 
             # Update RWS.
@@ -475,9 +504,16 @@ class ProxyService(TriggeredService):
                              "unexistent submission id %s.", submission_id)
                 raise KeyError("Submission not found.")
 
-            if submission.user.hidden:
+            if submission.participation.hidden:
                 logger.info("[submission_tokened] Token for submission %d "
-                            "not sent because user is hidden.", submission_id)
+                            "not sent because participation is hidden.",
+                            submission_id)
+                return
+
+            if not submission.official:
+                logger.info("[submission_tokened] Token for submission %d "
+                            "not sent because the submission is not official.",
+                            submission_id)
                 return
 
             # Update RWS.
@@ -510,7 +546,9 @@ class ProxyService(TriggeredService):
 
             for submission in task.submissions:
                 # Update RWS.
-                if not submission.user.hidden and \
+                if not submission.participation.hidden and \
+                        submission.official and \
+                        submission.get_result() is not None and \
                         submission.get_result().scored():
                     for operation in self.operations_for_score(submission):
                         self.enqueue(operation)

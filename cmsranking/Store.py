@@ -1,8 +1,8 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
-# Copyright © 2011-2013 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2011-2015 Luca Wehrstedt <luca.wehrstedt@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -18,8 +18,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
+from six import PY3, iterkeys, iteritems
 
 import io
 import json
@@ -29,7 +33,6 @@ import re
 
 from gevent.lock import RLock
 
-from cmsranking.Config import config
 from cmsranking.Entity import Entity, InvalidKey, InvalidData
 
 
@@ -51,7 +54,7 @@ class Store(object):
     callbacks.
 
     """
-    def __init__(self, entity, dir_name, depends=None):
+    def __init__(self, entity, path, all_stores, depends=None):
         """Initialize an empty EntityStore.
 
         The entity definition given as argument will define what kind
@@ -65,13 +68,18 @@ class Store(object):
             raise ValueError("The 'entity' parameter "
                              "isn't a subclass of Entity")
         self._entity = entity
-        self._path = os.path.join(config.lib_dir, dir_name)
+        self._path = path
+        self._all_stores = all_stores
         self._depends = depends if depends is not None else []
         self._store = dict()
         self._create_callbacks = list()
         self._update_callbacks = list()
         self._delete_callbacks = list()
 
+    def load_from_disk(self):
+        """Load the initial data for this store from the disk.
+
+        """
         try:
             os.mkdir(self._path)
         except OSError:
@@ -84,7 +92,7 @@ class Store(object):
                 if name[-5:] == '.json' and name[:-5] != '':
                     with io.open(os.path.join(self._path, name), 'rb') as rec:
                         item = self._entity()
-                        item.set(json.load(rec, encoding='utf-8'))
+                        item.set(json.load(rec))
                         item.key = name[:-5]
                         self._store[name[:-5]] = item
         except OSError:
@@ -142,14 +150,14 @@ class Store(object):
             some properties or if properties are of the wrong type.
 
         """
-        if not isinstance(key, unicode) or key in self._store:
+        if not isinstance(key, str) or key in self._store:
             raise InvalidKey("Key already in store.")
 
         # create entity
         with LOCK:
             item = self._entity()
             item.set(data)
-            if not item.consistent():
+            if not item.consistent(self._all_stores):
                 raise InvalidData("Inconsistent data")
             item.key = key
             self._store[key] = item
@@ -159,8 +167,12 @@ class Store(object):
             # reflect changes on the persistent storage
             try:
                 path = os.path.join(self._path, key + '.json')
-                with io.open(path, 'wb') as rec:
-                    json.dump(self._store[key].get(), rec, encoding='utf-8')
+                if PY3:
+                    with io.open(path, 'wt', encoding="utf-8") as rec:
+                        json.dump(self._store[key].get(), rec)
+                else:
+                    with io.open(path, 'wb') as rec:
+                        json.dump(self._store[key].get(), rec)
             except IOError:
                 logger.error("I/O error occured while creating entity",
                              exc_info=True)
@@ -180,14 +192,14 @@ class Store(object):
             some properties or if properties are of the wrong type.
 
         """
-        if not isinstance(key, unicode) or key not in self._store:
+        if not isinstance(key, str) or key not in self._store:
             raise InvalidKey("Key not in store.")
 
         # update entity
         with LOCK:
             item = self._entity()
             item.set(data)
-            if not item.consistent():
+            if not item.consistent(self._all_stores):
                 raise InvalidData("Inconsistent data")
             item.key = key
             old_item = self._store[key]
@@ -198,8 +210,12 @@ class Store(object):
             # reflect changes on the persistent storage
             try:
                 path = os.path.join(self._path, key + '.json')
-                with io.open(path, 'wb') as rec:
-                    json.dump(self._store[key].get(), rec, encoding='utf-8')
+                if PY3:
+                    with io.open(path, 'wt', encoding="utf-8") as rec:
+                        json.dump(self._store[key].get(), rec)
+                else:
+                    with io.open(path, 'wb') as rec:
+                        json.dump(self._store[key].get(), rec)
             except IOError:
                 logger.error("I/O error occured while updating entity",
                              exc_info=True)
@@ -222,7 +238,7 @@ class Store(object):
             if not isinstance(data_dict, dict):
                 raise InvalidData("Not a dictionary")
             item_dict = dict()
-            for key, value in data_dict.iteritems():
+            for key, value in iteritems(data_dict):
                 try:
                     # FIXME We should allow keys to be arbitrary unicode
                     # strings, so this just needs to be a non-empty check.
@@ -230,7 +246,7 @@ class Store(object):
                         raise InvalidData("Invalid key")
                     item = self._entity()
                     item.set(value)
-                    if not item.consistent():
+                    if not item.consistent(self._all_stores):
                         raise InvalidData("Inconsistent data")
                     item.key = key
                     item_dict[key] = item
@@ -239,7 +255,7 @@ class Store(object):
                     exc.args = exc.message,
                     raise exc
 
-            for key, value in item_dict.iteritems():
+            for key, value in iteritems(item_dict):
                 is_new = key not in self._store
                 old_value = self._store.get(key)
                 # insert entity
@@ -254,8 +270,12 @@ class Store(object):
                 # reflect changes on the persistent storage
                 try:
                     path = os.path.join(self._path, key + '.json')
-                    with io.open(path, 'wb') as rec:
-                        json.dump(value.get(), rec, encoding='utf-8')
+                    if PY3:
+                        with io.open(path, 'wt', encoding="utf-8") as rec:
+                            json.dump(value.get(), rec)
+                    else:
+                        with io.open(path, 'wb') as rec:
+                            json.dump(value.get(), rec)
                 except IOError:
                     logger.error(
                         "I/O error occured while merging entity lists",
@@ -272,7 +292,7 @@ class Store(object):
             with that key is present in the store.
 
         """
-        if not isinstance(key, unicode) or key not in self._store:
+        if not isinstance(key, str) or key not in self._store:
             raise InvalidKey("Key not in store.")
 
         with LOCK:
@@ -281,8 +301,8 @@ class Store(object):
             del self._store[key]
             # enforce consistency
             for depend in self._depends:
-                for o_key, o_value in list(depend._store.iteritems()):
-                    if not o_value.consistent():
+                for o_key, o_value in list(iteritems(depend._store)):
+                    if not o_value.consistent(self._all_stores):
                         depend.delete(o_key)
             # notify callbacks
             for callback in self._delete_callbacks:
@@ -301,7 +321,7 @@ class Store(object):
         """
         with LOCK:
             # delete all entities
-            for key in list(self._store.iterkeys()):
+            for key in list(iterkeys(self._store)):
                 self.delete(key)
 
     def retrieve(self, key):
@@ -315,7 +335,7 @@ class Store(object):
             with that key is present in the store.
 
         """
-        if not isinstance(key, unicode) or key not in self._store:
+        if not isinstance(key, str) or key not in self._store:
             raise InvalidKey("Key not in store.")
 
         # retrieve entity
@@ -324,7 +344,7 @@ class Store(object):
     def retrieve_list(self):
         """Retrieve a list of all entities."""
         result = dict()
-        for key, value in self._store.iteritems():
+        for key, value in iteritems(self._store):
             result[key] = value.get()
         return result
 

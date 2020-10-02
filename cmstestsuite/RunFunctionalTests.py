@@ -1,9 +1,11 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2012 Bernard Blackham <bernard@largestprime.net>
-# Copyright © 2013-2014 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2013-2018 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2014 Luca Versari <veluca93@gmail.com>
+# Copyright © 2016 Luca Wehrstedt <luca.wehrstedt@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -19,185 +21,33 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
+import argparse
 import io
+import logging
 import os
-import sys
-import subprocess
-import datetime
 import re
+import sys
 
-from argparse import ArgumentParser
+from cms import utf8_decoder
+from cmstestsuite import CONFIG
+from cmstestsuite.coverage import clear_coverage, combine_coverage, \
+    send_coverage_to_codecov
+from cmstestsuite.profiling import \
+    PROFILER_KERNPROF, PROFILER_NONE, PROFILER_YAPPI
+from cmstestsuite.testrunner import TestRunner
+from cmstestsuite.Tests import ALL_TESTS
 
-from cms import LANGUAGES, utf8_decoder
-from cmstestsuite import get_cms_config, CONFIG, info, sh
-from cmstestsuite import add_contest, add_existing_user, add_existing_task, \
-    add_user, add_task, add_testcase, add_manager, combine_coverage, \
-    get_tasks, get_users, start_service, start_server, \
-    start_ranking_web_server, shutdown_services, restart_service
-from cmstestsuite.Test import TestFailure
-import cmstestsuite.Tests
-from cmscommon.datetime import get_system_timezone
+
+logger = logging.getLogger(__name__)
 
 
 FAILED_TEST_FILENAME = '.testfailures'
-
-# This stores a mapping from task name to (task id, task_module)
-task_id_map = {}
-
-
-def start_generic_services():
-    start_service("LogService")
-    start_service("ResourceService")
-    start_service("Checker")
-    start_service("Worker")
-    start_service("ScoringService")
-    start_server("AdminWebServer")
-    # Just to verify it starts successfully.
-    start_ranking_web_server()
-
-
-def create_contest():
-    start_time = datetime.datetime.utcnow()
-    stop_time = start_time + datetime.timedelta(1, 0, 0)
-    contest_id = add_contest(
-        name="testcontest1",
-        description="A test contest #1.",
-        languages=LANGUAGES,
-        start=start_time.strftime("%Y-%m-%d %H:%M:%S.%f"),
-        stop=stop_time.strftime("%Y-%m-%d %H:%M:%S.%f"),
-        timezone=get_system_timezone(),
-        token_mode="finite",
-        token_max_number="100",
-        token_min_interval="0",
-        token_gen_initial="100",
-        token_gen_number="0",
-        token_gen_interval="1",
-        token_gen_max="100",
-    )
-
-    info("Created contest %d." % contest_id)
-
-    return contest_id
-
-
-def start_contest(contest_id):
-    start_service("EvaluationService", contest=contest_id)
-    start_server("ContestWebServer", contest=contest_id)
-    # Just to verify it starts successfully.
-    start_service("ProxyService", contest=contest_id)
-
-
-global num_users
-num_users = 0
-
-
-def create_or_get_user(contest_id):
-    global num_users
-    num_users += 1
-
-    def enumerify(x):
-        if 11 <= x <= 13:
-            return 'th'
-        return {1: 'st', 2: 'nd', 3: 'rd'}.get(x % 10, 'th')
-
-    username = "testrabbit%d" % num_users
-
-    # Find a user that may already exist (from a previous contest).
-    users = get_users(contest_id)
-    user_create_args = {
-        "username": username,
-        "password": "kamikaze",
-        "first_name": "Ms. Test",
-        "last_name": "Wabbit the %d%s" % (num_users, enumerify(num_users)),
-    }
-    if username in users:
-        user_id = users[username]['id']
-        add_existing_user(contest_id, user_id, **user_create_args)
-        info("Using existing user with id %d." % user_id)
-    else:
-        user_id = add_user(contest_id, **user_create_args)
-        info("Created user with id %d." % user_id)
-    return user_id
-
-
-def get_task_id(contest_id, user_id, task_module):
-    name = task_module.task_info['name']
-
-    # Have we done this before? Pull it out of our cache if so.
-    if task_module in task_id_map:
-        # Ensure we don't have multiple modules with the same task name.
-        assert task_id_map[task_module][1] == task_module
-
-        return task_id_map[name][0]
-
-    task_create_args = {
-        "token_mode": "finite",
-        "token_max_number": "100",
-        "token_min_interval": "0",
-        "token_gen_initial": "100",
-        "token_gen_number": "0",
-        "token_gen_interval": "1",
-        "token_gen_max": "100",
-        "max_submission_number": "100",
-        "max_user_test_number": "100",
-        "min_submission_interval": None,
-        "min_user_test_interval": None,
-    }
-    task_create_args.update(task_module.task_info)
-
-    # Find if the task already exists in the contest.
-    tasks = get_tasks(contest_id)
-    if name in tasks:
-        # Then just use the existing one.
-        task = tasks[name]
-        task_id = task['id']
-        task_id_map[name] = (task_id, task_module)
-        add_existing_task(contest_id, task_id, **task_create_args)
-        return task_id
-
-    # Otherwise, we need to add the task ourselves.
-    task_id = add_task(contest_id, **task_create_args)
-
-    # add any managers
-    code_path = os.path.join(
-        os.path.dirname(task_module.__file__),
-        "code")
-    if hasattr(task_module, 'managers'):
-        for manager in task_module.managers:
-            mpath = os.path.join(code_path, manager)
-            add_manager(task_id, mpath)
-
-    # add the task's test data.
-    data_path = os.path.join(
-        os.path.dirname(task_module.__file__),
-        "data")
-    for num, (input_file, output_file, public) \
-            in enumerate(task_module.test_cases):
-        ipath = os.path.join(data_path, input_file)
-        opath = os.path.join(data_path, output_file)
-        add_testcase(task_id, num, ipath, opath, public)
-
-    task_id_map[name] = (task_id, task_module)
-
-    info("Created task %s as id %d" % (name, task_id))
-
-    # We need to restart ProxyService to ensure it reinitializes,
-    # picking up the new task and sending it to RWS.
-    restart_service("ProxyService", contest=contest_id)
-
-    return task_id
-
-
-def get_all_tests():
-    tests = []
-    for i, test in enumerate(cmstestsuite.Tests.ALL_TESTS):
-        for lang in test.languages:
-            tests.append((test, lang))
-
-    return tests
 
 
 def load_test_list_from_file(filename):
@@ -219,7 +69,7 @@ def load_test_list_from_file(filename):
     errors = False
 
     name_to_test_map = {}
-    for test in cmstestsuite.Tests.ALL_TESTS:
+    for test in ALL_TESTS:
         if test.name in name_to_test_map:
             print("ERROR: Multiple tests with the same name `%s'." % test.name)
             errors = True
@@ -227,13 +77,15 @@ def load_test_list_from_file(filename):
 
     tests = []
     for i, line in enumerate(lines):
-        bits = [x.strip() for x in line.split()]
+        bits = [x.strip() for x in line.split(" ", 1)]
         if len(bits) != 2:
             print("ERROR: %s:%d invalid line: %s" % (filename, i + 1, line))
             errors = True
             continue
 
         name, lang = bits
+        if lang == "None":
+            lang = None
 
         if name not in name_to_test_map:
             print("ERROR: %s:%d invalid test case: %s" %
@@ -257,30 +109,44 @@ def load_test_list_from_file(filename):
 
 
 def load_failed_tests():
-    list = load_test_list_from_file(FAILED_TEST_FILENAME)
-    if list is None:
+    test_lang_list = load_test_list_from_file(FAILED_TEST_FILENAME)
+    if test_lang_list is None:
         sys.exit(1)
 
-    return list
+    tests = set(test_lang[0] for test_lang in test_lang_list)
+    test_list = []
+    for new_test in tests:
+        langs = new_test.languages
+        new_test.languages = []
+        for test, lang in test_lang_list:
+            if new_test == test and lang in langs:
+                new_test.languages.append(lang)
+        test_list.append(new_test)
+
+    return test_list
 
 
-def filter_testcases(orig_test_list, regexes, languages):
+def filter_tests(orig_test_list, regexes, languages):
     """Filter out skipped test cases from a list."""
-    # Define a function that returns true if the given test case matches the
-    # criteria.
-    def use(test, lang):
+    # Select only those (test, language) pairs that pass our checks.
+    new_test_list = []
+    for test in orig_test_list:
         # No regexes means no constraint on test names.
         ok = not regexes
         for regex in regexes:
             if regex.search(test.name):
                 ok = True
                 break
-        if ok and languages:
-            ok = lang in languages
-        return ok
-
-    # Select only those (test, language) pairs that pass our checks.
-    return [(test, lang) for test, lang in orig_test_list if use(test, lang)]
+        if ok:
+            remaining_languages = test.languages
+            if languages:
+                remaining_languages = tuple(lang
+                                            for lang in test.languages
+                                            if lang in languages)
+            if remaining_languages != ():
+                test.languages = remaining_languages
+                new_test_list.append(test)
+    return new_test_list
 
 
 def write_test_case_list(test_list, filename):
@@ -289,81 +155,11 @@ def write_test_case_list(test_list, filename):
             f.write('%s %s\n' % (test.name, lang))
 
 
-def run_testcases(contest_id, user_id, test_list):
-    """Run all test cases specified by the Tests module.
-
-    contest_id and user_id must specify an already-created contest and user
-    under which the tests are submitted.
-
-    test_list should be a list of 2-tuples, each representing a test. The first
-    element of each tuple is a Test object, and the second is the language for
-    which it should be executed.
-    """
-    info("Running test cases ...")
-
-    failures = []
-    num_tests_to_execute = len(test_list)
-
-    # For all tests...
-    for i, (test, lang) in enumerate(test_list):
-        # This installs the task into the contest if we haven't already.
-        task_id = get_task_id(contest_id, user_id, test.task_module)
-
-        info("Running test %d/%d: %s (%s)" % (
-            i + 1, num_tests_to_execute,
-            test.name, lang))
-
-        try:
-            test.run(contest_id, task_id, user_id, lang)
-        except TestFailure as f:
-            info("  (FAILED: %s)" % f.message)
-
-            # Add this case to our list of failures, if we haven't already.
-            failures.append((test, lang, f.message))
-
-    results = "\n\n"
-    if not failures:
-        results += "================== ALL TESTS PASSED! ==================\n"
-    else:
-        results += "------ TESTS FAILED: ------\n"
-
-    results += " Executed: %d\n" % num_tests_to_execute
-    results += "   Failed: %d\n" % len(failures)
-    results += "\n"
-
-    for test, lang, msg in failures:
-        results += " %s (%s): %s\n" % (test.name, lang, msg)
-
-    if failures:
-        write_test_case_list(
-            [(test, lang) for test, lang, _ in failures],
-            FAILED_TEST_FILENAME)
-        results += "\n"
-        results += "Failed tests stored in %s.\n" % FAILED_TEST_FILENAME
-        results += "Run again with --retry-failed (or -r) to retry.\n"
-
-    return len(failures) == 0, results
-
-
-def time_difference(start_time, end_time):
-    secs = int((end_time - start_time).total_seconds())
-    mins = secs / 60
-    secs = secs % 60
-    hrs = mins / 60
-    mins = mins % 60
-    return "Time elapsed: %02d:%02d:%02d" % (hrs, mins, secs)
-
-
-def config_is_usable(cms_config):
-    """Determine if this configuration is suitable for testing."""
-
-    return True
-
-
 def main():
-    parser = ArgumentParser(description="Runs the CMS functional test suite.")
+    parser = argparse.ArgumentParser(
+        description="Runs the CMS functional test suite.")
     parser.add_argument(
-        "regex", action="store", type=utf8_decoder, nargs='*', metavar="regex",
+        "regex", action="store", type=utf8_decoder, nargs='*',
         help="a regex to match to run a subset of tests")
     parser.add_argument(
         "-l", "--languages", action="store", type=utf8_decoder, default="",
@@ -379,15 +175,27 @@ def main():
         "-n", "--dry-run", action="store_true",
         help="show what tests would be run, but do not run them")
     parser.add_argument(
-        "-v", "--verbose", action="count",
+        "-v", "--verbose", action="count", default=0,
         help="print debug information (use multiple times for more)")
+    parser.add_argument(
+        "--codecov", action="store_true",
+        help="send coverage results to Codecov (requires --coverage)")
+    g = parser.add_mutually_exclusive_group()
+    g.add_argument(
+        "--coverage", action="store_true",
+        help="compute line coverage information")
+    g.add_argument(
+        "--profiler", choices=[PROFILER_YAPPI, PROFILER_KERNPROF],
+        default=PROFILER_NONE, help="set profiler")
     args = parser.parse_args()
+    if args.codecov and not args.coverage:
+        parser.error("--codecov requires --coverage")
 
     CONFIG["VERBOSITY"] = args.verbose
+    CONFIG["COVERAGE"] = args.coverage
+    CONFIG["PROFILER"] = args.profiler
 
-    start_time = datetime.datetime.now()
-
-    # Pre-process our command-line arugments to figure out which tests to run.
+    # Pre-process our command-line arguments to figure out which tests to run.
     regexes = [re.compile(s) for s in args.regex]
     if args.languages:
         languages = frozenset(args.languages.split(','))
@@ -396,72 +204,66 @@ def main():
     if args.retry_failed:
         test_list = load_failed_tests()
     else:
-        test_list = get_all_tests()
-    test_list = filter_testcases(test_list, regexes, languages)
+        test_list = ALL_TESTS
+    test_list = filter_tests(test_list, regexes, languages)
 
     if not test_list:
-        info("There are no tests to run! (was your filter too restrictive?)")
+        logger.info(
+            "There are no tests to run! (was your filter too restrictive?)")
         return 0
 
+    tests = 0
+    for test in test_list:
+        for language in test.languages:
+            if args.dry_run:
+                logger.info("Test %s in %s.", test.name, language)
+            tests += 1
+        if test.user_tests:
+            for language in test.languages:
+                if args.dry_run:
+                    logger.info("Test %s in %s (for usertest).",
+                                test.name, language)
+                tests += 1
     if args.dry_run:
-        for t in test_list:
-            print(t[0].name, t[1])
         return 0
 
     if args.retry_failed:
-        info("Re-running %d failed tests from last run." % len(test_list))
+        logger.info(
+            "Re-running %s failed tests from last run.", len(test_list))
 
-    # Load config from cms.conf.
-    try:
-        git_root = subprocess.check_output(
-            "git rev-parse --show-toplevel", shell=True,
-            stderr=io.open(os.devnull, "wb")).strip()
-    except subprocess.CalledProcessError:
-        git_root = None
-    CONFIG["TEST_DIR"] = git_root
-    CONFIG["CONFIG_PATH"] = "%s/examples/cms.conf" % CONFIG["TEST_DIR"]
-    if CONFIG["TEST_DIR"] is None:
-        CONFIG["CONFIG_PATH"] = "/usr/local/etc/cms.conf"
-    cms_config = get_cms_config()
+    clear_coverage()
 
-    if not config_is_usable(cms_config):
-        return 1
+    # Startup the test runner.
+    runner = TestRunner(test_list, contest_id=args.contest, workers=4)
 
-    if CONFIG["TEST_DIR"] is not None:
-        # Set up our expected environment.
-        os.chdir("%(TEST_DIR)s" % CONFIG)
-        os.environ["PYTHONPATH"] = "%(TEST_DIR)s" % CONFIG
-
-        # Clear out any old coverage data.
-        info("Clearing old coverage data.")
-        sh("python-coverage erase")
-
-    # Fire us up!
-    start_generic_services()
-    if args.contest is None:
-        contest_id = create_contest()
-    else:
-        contest_id = int(args.contest)
-    user_id = create_or_get_user(contest_id)
-
-    start_contest(contest_id)
-
-    # Run all of our test cases.
-    passed, test_results = run_testcases(contest_id, user_id, test_list)
+    # Submit and wait for all tests to complete.
+    runner.submit_tests()
+    failures = runner.wait_for_evaluation()
+    write_test_case_list(
+        [(test, lang) for test, lang, _ in failures],
+        FAILED_TEST_FILENAME)
 
     # And good night!
-    shutdown_services()
+    runner.shutdown()
+    runner.log_elapsed_time()
     combine_coverage()
 
-    print(test_results)
+    if args.codecov:
+        send_coverage_to_codecov("functionaltests")
 
-    end_time = datetime.datetime.now()
-    print(time_difference(start_time, end_time))
-
-    if passed:
+    logger.info("Executed: %s", tests)
+    logger.info("Failed: %s", len(failures))
+    if not failures:
+        logger.info("All tests passed!")
         return 0
     else:
+        logger.error("Some test failed!")
+        logger.info("Run again with --retry-failed (or -r) to retry.")
+        logger.info("Failed tests:")
+        for test, lang, msg in failures:
+            logger.info("%s (%s): %s\n", test.name, lang, msg)
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

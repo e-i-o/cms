@@ -1,7 +1,7 @@
 Configuring a contest
 *********************
 
-In the following text "user" and "contestant" are used interchangeably.
+In the following text "user" and "contestant" are used interchangeably. A "participation" is an instance of a user participating in a specific contest. See :doc:`here <Data model>` for more details.
 
 Configuration parameters will be referred to using their internal name, but it should always be easy to infer what fields control them in the AWS interface by using their label.
 
@@ -19,23 +19,27 @@ Contest administrators can limit the ability of users to submit submissions and 
 
 - ``min_submission_interval`` / ``min_user_test_interval``
 
-  These set, respectively, the minimum amount of time the user is required to wait after a submission or user test has been submitted before they are allowed to send in new ones. Any attempt to submit a submission or user test before this timeout has expired will fail.
+  These set, respectively, the minimum amount of time, in seconds, the user is required to wait after a submission or user test has been submitted before they are allowed to send in new ones. Any attempt to submit a submission or user test before this timeout has expired will fail.
 
 The limits can be set both for individual tasks and for the whole contest. A submission or user test is accepted if it verifies the conditions on both the task *and* the contest. This means that a submission or user test will be accepted if the number of submissions or user tests received so far for that task is strictly less that the task's maximum number *and* the number of submissions or user tests received so far for the whole contest (i.e. in all tasks) is strictly less than the contest's maximum number. The same holds for the minimum interval too: a submission or user test will be accepted if the time passed since the last submission or user test for that task is greater than the task's minimum interval *and* the time passed since the last submission or user test received for the whole contest (i.e. in any of the tasks) is greater than the contest's minimum interval.
 
 Each of these fields can be left unset to prevent the corresponding limitation from being enforced.
 
 
+Feedback to contestants
+=======================
+
+Each testcase can be marked as public or private. After sending a submission, a contestant can always see its results on the public testcases: a brief passed / partial / not passed status for each testcase, and the partial score that is computable from the public testcases only. Note that input and output data are always hidden.
+
+Tokens were introduced to provide contestants with limited access to the detailed results of their submissions on the private testcases as well. If a contestant uses a token on a submission, then they will be able to see its result on all testcases, and the global score.
+
+
 .. _configuringacontest_tokens:
 
-Feedback and tokens
-===================
+Tokens rules
+------------
 
-Each testcase can be marked as public or private. During the contest, contestants can see the result of their submissions on the public testcases (the content of the input and output data themselves remain hidden, though). Tokens are a concept introduced to provide contestants with limited access to the detailed results of their submissions on the private testcases as well.
-
-For every submission sent in for evaluation, a contestant is always able to see if it succesfully compiled. They are also able to see its scores on the public testcases of the task, if any. All information about the other so-called private testcases is kept hidden. Yet, a contestant can choose to use one of its tokens to "unlock" a certain submission of their choice. After they do so, detailed results are available for all testcases, as if they were all public. A token, once used, is consumed and lost forever. Contestants have a set of available tokens at their disposal, where the ones they use are picked from. These sets are managed by CMS according to rules defined by the contest administrators, as explained later in this section. For all official :doc:`score types <Score types>`, the public score is the score on public testcases, whereas the detailed score is the score on all testcases. This is not necessarily true for custom score types, as they can implement arbitrary logics to compute those values.
-
-Tokens also affect the score computation. That is, all "tokened" submissions will be considered, together with the last submitted one, when computing the score for a task. See also :ref:`configuringacontest_score-rounding`.
+Each contestant have a set of available tokens at their disposal; when they use a token it is taken from this set, and cannot be use again. These sets are managed by CMS according to rules defined by the contest administrators, as explained later in this section.
 
 There are two types of tokens: contest-tokens and task-tokens. When a contestant uses a token to unlock a submission, they are really using one token of each type, and therefore needs to have both available. As the names suggest, contest-tokens are bound to the contest while task-tokens are bound to a specific task. That means that there is just one set of contest-tokens but there can be many sets of task-tokens (precisely one for every task). These sets are controlled independently by rules defined either on the contest or on the task.
 
@@ -49,40 +53,65 @@ Having a finite set of both contest- and task-tokens can be very confusing, for 
 
 Note that "token sets" are "intangible": they're just a counter shown to the user, computed dynamically every time. Yet, once a token is used, a Token object will be created, stored in the database and associated with the submission it was used on.
 
-.. note::
-   The full-feedback mode introduced in IOI 2013 has not been ported upstream yet (see :gh_issue:`246`). Note that although disabling tokens and making all testcases public would give full feedback, the final scores would be computed differently: the one of the latest submission would be used instead of the maximum among all submissions. To achieve the correct scoring behavior, get in touch with the developers or check `the ML archives <http://www.freelists.org/post/contestms/applying-tokens-automatically,1>`_.
-
 Changing token rules during a contest may lead to inconsistencies. Do so at your own risk!
 
 
-.. _configuringacontest_score-rounding:
+.. _configuringacontest_score:
+
+Computation of the score
+========================
+
+
+Released submissions
+--------------------
+
+The score of a contestant for the contest is always the sum of the score for each task. The score for a task is the best score among the set of "released" submissions.
+
+Admins can use the configuration "Score mode" in AdminWebServer to change the way CMS defines the set of released submission. There are two ways, corresponding to the rules of IOI 2010-2012 and IOI 2013-.
+
+In the first mode, used in IOI from 2010 to 2012, the released submissions are those on which the contestant used a token, plus the latest one submitted.
+
+In the second mode, used since 2013, the released submissions are all submissions.
+
+Usually, a task using the first mode will have a certain number of private testcases, and a limited sets of tokens. In this situation, you can think that contestants are required to "choose" the submission they want to use for grading, by submitting it last, or by using a token on it.
+
+On the other hand, a task using the second mode usually has all testcases public, and therefore it would be silly to ask contestants to choose the submission (as they would always choose the one with the best score).
+
 
 Score rounding
-==============
+--------------
 
 Based on the ScoreTypes in use and on how they are configured, some submissions may be given a floating-point score. Contest administrators will probably want to show only a small number of these decimal places in the scoreboard. This can be achieved with the ``score_precision`` fields on the contest and tasks.
 
 The score of a user on a certain task is the maximum among the scores of the "tokened" submissions for that task, and the last one. This score is rounded to a number of decimal places equal to the ``score_precision`` field of the task. The score of a user on the whole contest is the sum of the *rounded* scores on each task. This score itself is then rounded to a number of decimal places equal to the ``score_precision`` field of the contest.
 
-Note that some "internal" scores used by ScoreTypes (for example the subtask score) are not rounded using this procedure. At the moment the subtask scores are always rounded at two decimal places and there's no way to configure that (note that the score of the submission is the sum of the *unrounded* scores of the subtasks). That will be changed soon. See :gh_issue:`33`.
+Note that some "internal" scores used by ScoreTypes (for example the subtask score) are not rounded using this procedure. At the moment the subtask scores are always rounded at two decimal places and there's no way to configure that (note that the score of the submission is the sum of the *unrounded* scores of the subtasks).
 
 The unrounded score is stored in the database (and it's rounded only at presentation level) so you can change the ``score_precision`` at any time without having to rescore any submissions. Yet, you have to make sure that these values are also updated on the RankingWebServers. To do that you can either restart ScoringService or update the data manually (see :doc:`RankingWebServer` for further information).
 
 
-Primary statements
-==================
+Languages
+=========
 
-When there are many statements for a certain task (which are often different translations of the same statement) contest administrators may want to highlight some of them to the users. These may include, for example, the "official" version of the statement (the one that is considered the reference version in case of questions or appeals) or the translations for the languages understood by that particular user. To do that the ``primary_statements`` field of the tasks and the users has to be used.
+Statements
+----------
 
-The ``primary_statements`` field for the tasks is a JSON-encoded list of strings: it specifies the language codes of the statements that will be highlighted to all users. A valid example is ``["en_US", "it"]``. The ``primary_statements`` field for the users is a JSON-encoded object of lists of strings. Each item in this object specifies a task by its name and provides a list of language codes of the statements to highlight. For example ``{"task1": ["de"], "task2": ["de_CH"]}``.
+When there are many statements for a certain task (which are often different translations of the same statement) contest administrators may want to highlight some of them to the users. These may include, for example, the "official" version of the statement (the one that is considered the reference version in case of questions or appeals) or the translations for the languages understood by that particular user. To do that the ``primary_statements`` field of the tasks and the ``preferred_languages`` field of the users has to be used.
+
+The ``primary_statements`` field for the tasks is a list of strings: it specifies the language codes of the statements that will be highlighted to all users. A valid example is ``en_US, it``. The ``preferred_languages`` field for the users is a list of strings: it specifies the language codes of the statements to highlight. For example ``de, de_CH``.
 
 Note that users will always be able to access all statements, regardless of the ones that are highlighted. Note also that language codes in the form ``xx`` or ``xx_YY`` (where ``xx`` is an `ISO 639-1 code <http://www.iso.org/iso/language_codes.htm>`_ and ``YY`` is an `ISO 3166-1 code <http://www.iso.org/iso/country_codes.htm>`_) will be recognized and presented accordingly. For example ``en_AU`` will be shown as "English (Australia)".
+
+Interface
+---------
+
+The interface for contestants can be localized (see :ref:`localization` for how to add new languages), and by default all languages will be available to all contestants. To limit the languages available to the contestants, the field "Allowed localizations" in the contest configuration can be set to the list of allowed language codes. The first of this language codes determines the fallback language in case the preferred language is not available.
 
 
 Timezone
 ========
 
-CMS stores all times as UTC timestamps and converts them to an appropriate timezone when displaying them. This timezone can be specified on a per-user and per-contest basis with the ``timezone`` field. It needs to contain a string in the format ``Europe/Rome`` (actually, any string recognized by `pytz <http://pytz.sourceforge.net/>`_ will work).
+CMS stores all times as UTC timestamps and converts them to an appropriate timezone when displaying them. This timezone can be specified on a per-user and per-contest basis with the ``timezone`` field. It needs to contain a string recognized by `pytz <http://pytz.sourceforge.net/>`_, for example ``Europe/Rome``.
 
 When CWS needs to show a timestamp to the user it first tries to show it according to the user's timezone. If the string defining the timezone is unrecognized (for example it is the empty string), CWS will fallback to the contest's timezone. If it is again unable to interpret that string it will use the local time of the server.
 
@@ -92,11 +121,38 @@ When CWS needs to show a timestamp to the user it first tries to show it accordi
 User login
 ==========
 
-Users log into CWS using a username and a password. These have to be specified, respectively, in the ``username`` and ``password`` fields (in cleartext!). These credentials need to be inserted (i.e. there's no way to have an automatic login, a "guest" session, etc.) and, if they match, the login (usually) succeeds. The user needs to login again if they do not navigate the site for ``cookie_duration`` seconds (specified in the :file:`cms.conf` file).
+Users can log into CWS manually, using their credentials (username and a password), or they can get logged in automatically by CMS based on the IP address their requests are coming from.
 
-In fact, there are other reasons that can cause the login to fail. If the ``ip_lock`` option (in :file:`cms.conf`) is set to ``true`` then the login will fail if the IP address that attempted it doesn't match the address or subnet in the ``ip`` field of the specified user. If ``ip`` is not set then this check is skipped, even if ``ip_lock`` is ``true``. Note that if a reverse-proxy (like nginx) is in use then it is necessary to set ``is_proxy_used`` (in :file:`cms.conf`) to ``true`` and configure the proxy in order to properly pass the ``X-Forwarded-For``-style headers (see :ref:`running-cms_recommended-setup`).
+Logging in with IP-based autologin
+----------------------------------
 
-The login can also fail if ``block_hidden_users`` (in :file:`cms.conf`) is ``true`` and the user trying to login as has the ``hidden`` field set.
+If the "IP-based autologin" option in the contest configuration is set, CWS tries to find a user that matches the IP address the request is coming from. If it finds exactly one user, the requester is automatically logged in as that user. If zero or more than one user match, CWS does not let the user in (and the incident is logged to allow troubleshooting).
+
+In general, each user can have multiple ranges of IP addresses associated to it. These are defined as a list of subnets in CIDR format (e.g., `192.168.1.0/24`). Only the subnets whose mask is maximal (i.e., `/32` for IPv4 or `/128` for IPv6) are considered for autologin purposes (subnets with non-maximal mask are still useful for IP-based restrictions, see below). The autologin will kick in if *any* of the subnets matches the IP of the request.
+
+.. warning::
+
+  If a reverse-proxy (like nginx) is in use then it is necessary to set ``num_proxies_used`` (in :file:`cms.conf`) to ``1`` and configure the proxy in order to properly pass the ``X-Forwarded-For``-style headers (see :ref:`running-cms_recommended-setup`). That configuration option can be set to a higher number if there are more proxies between the origin and the server.
+
+Logging in with credentials
+---------------------------
+
+If the autologin is not enabled, users can log in with username and password, which have to be specified in the user configuration (in cleartext, for the moment). The password can also be overridden for a specific contest in the participation configuration. These credentials need to be inserted by the admins (i.e. there's no way to sign up, of log in as a "guest", etc.).
+
+A successfully logged in user needs to reauthenticate after ``cookie_duration`` seconds (specified in the :file:`cms.conf` file) from when they last visited a page.
+
+Even without autologin, it is possible to restrict the IP address or subnet that the user is using for accessing CWS, using the "IP-based login restriction" option in the contest configuration (in which case, admins need to set ``num_proxies_used`` as before). If this is set, then the login will fail if the IP address that attempted it does not match at least one of the addresses or subnets specified in the participation settings. If the participation IP address is not set, then no restriction applies.
+
+Failure to login
+----------------
+
+The following are some common reasons for login failures, all of them coming with some useful log message from CWS.
+
+- IP address mismatch (with IP-based autologin): if the IP address doesn't match any subnet of any participation or if it matches some subnets of more than one participation, then the login fails. Note that if the user is using the IP address of a different user, CWS will happily log them in without noticing anything.
+
+- IP address mismatch (using IP-based login restrictions): the login fails if the request comes from an IP address that doesn't match any of the participation's IP subnets (non-maximal masks are taken into consideration here).
+
+- Blocked hidden participations: users whose participation is hidden cannot log in if "Block hidden participations" is set in the contest configuration.
 
 
 .. _configuringacontest_usaco-like-contests:
@@ -116,13 +172,23 @@ Extra time and delay time
 
 Contest administrators may want to give some users a short additional amount of time in which they can compete to compensate for an incident (e.g. a hardware failure) that made them unable to compete for a while during the "intended" time frame. That's what the ``extra_time`` field of the users is for. The time frame in which the user is allowed to compete is expanded by its ``extra_time``, even if this would lead the user to be able to submit after the end of the contest.
 
-During extra time the user will continue to receive newly generated tokens. If you don't want them to have more tokens that other contestants, set the ``token_max_number`` parameter described above to the number of tokens you expect a user to have at their disposal during the whole contest (if it doesn't already have a value less than or equal to this). See also :gh_issue:`29`.
+During extra time the user will continue to receive newly generated tokens. If you don't want them to have more tokens that other contestants, set the ``token_max_number`` parameter described above to the number of tokens you expect a user to have at their disposal during the whole contest (if it doesn't already have a value less than or equal to this).
 
 Contest administrators can also alter the competition time of a contestant setting ``delay_time``, which has the effect of translating the competition time window for that contestant of the specified numer of seconds in the future. Thus, while setting ``extra_time`` *adds* some times at the end of the contest, setting ``delay_time`` *moves* the whole time window. As for ``extra_time``, setting ``delay_time`` may extend the contestant time window beyond the end of the contest itself.
 
 Both options have to be set to a non negative number. They can be used together, producing both their effects. Please read :doc:`Detailed timing configuration` for a more in-depth discussion of their exact effect.
 
-Note also that submissions sent during the extra time will continue to be considered when computing the score, even if the ``extra_time`` field of the user is later reset to zero (for example in case the user loses the appeal): you need to completely delete them from the database.
+Note also that submissions sent during the extra time will continue to be considered when computing the score, even if the ``extra_time`` field of the user is later reset to zero (for example in case the user loses the appeal): you need to completely delete them from the database or make them unofficial, and make sure the score in all rankings reflects the new state.
+
+
+Analysis mode
+=============
+
+After the contest it is often customary to allow contestants to see the results of all their submissions and use the grading system to try different solutions. CMS offers an analysis mode to do this. Solutions submitted during the analysis are evaluated as usual, but are marked as not official, and thus do not contribute to the rankings. Users will also be prevented from using tokens.
+
+The admins can enable the analysis mode in the contest configuration page in AWS; they also must set start end stop time (which must be after the contest end).
+
+By awarding extra time or adding delay to a contestant, it is possible to extend the contest time for a user over the start of the analysis. In this case, the start of the analysis will be postponed for this user. If the contest rules contemplate extra time or delay, we suggest to avoid starting the analysis right after the end of the contest.
 
 
 .. _configuringacontest_programming-languages:
@@ -130,21 +196,46 @@ Note also that submissions sent during the extra time will continue to be consid
 Programming languages
 =====================
 
-It is possible to limit the set of programming languages available to contestants by setting the appropriate configuration in the contest page in AWS. By default, the historical set of IOI programming languages is allowed (C, C++, and Pascal). These languages have been used in several contests and with many different types of tasks, and are thus fully tested and safe.
+CMS allows to restrict the set of programming languages available to contestants in a certain contest; the configuration is in the contest page in AWS.
 
-Contestants may be also allowed to use Java, Python and PHP, but these languages have only been tested for Batch tasks, and have not been thoroughly analyzed for potential security and usability issues. Being run under the sandbox, they should be reasonably safe, but, for example, the libraries available to contestants might be hard to control.
+CMS offers out of the box the following combination of languages: C, C++, Pascal, Java (in two flavours, either compiled with gcj or using a JDK), Python 2, PHP.
+
+C, C++ and Pascal are the default languages, and, together with Java with gcj, have been tested thoroughly in many contests.
+
+PHP and Python have only been tested with Batch task types, and have not thoroughly analyzed for potential security and usability issues. Being run under the sandbox, they should be reasonably safe, but, for example, the libraries available to contestants might be hard to control.
+
+Java with JDK works with Batch and Communication task types. Under usual conditions (default submission format) contestants must name their class as the short name of the task.
+
+.. warning::
+
+   Java with JDK uses multithreading even for simple programs. Therefore, if this language is allowed in the contest, multithreading and multiprocessing will be allowed in the sandbox for *all* evaluations (even with other languages).
+
+   If a solution uses multithreading or multiprocessing, the time limit is checked against the sum of the user times of all threads and processes.
+
 
 Language details
 ----------------
 
+* C and C++ are supported through the GNU Compiler Collection. Submissions are optimized with ``-O2``, and use the 2011 standards for C and C++.
+
+* Java with gcj is also supported through the GNU Compiled Collection. Programs are compiled with ``gcj``, optimized with ``-O3``, and then run as normal executables. Notice that gcj only fully supports Java 1.4.
+
+* Java with JDK uses the system version of the Java compiler and JVM.
+
 * Pascal support is provided by ``fpc``, and submissions are optimized with ``-O2``.
-
-* C/C++ support is provided by the GNU Compiler Collection. Submissions are optimized with ``-O2``. The standards used by default by CMS are gnu90 for C (that is, C90 with the GNU extension, the default for ``gcc``) and C++11 for C++. Note that C++11 support in ``g++`` is still incomplete and experimental. Please refer to the `C++11 Support in GCC <https://gcc.gnu.org/projects/cxx0x.html>`_ page for more information.
-
-* Java programs are first compiled using ``gcj`` (optimized with ``-O3``), and then run as normal executables.
 
 * Python submissions are interpreted using Python 2 (you need to have ``/usr/bin/python2``).
 
-* PHP submissions are interpreted by ``/usr/bin/php5``.
+* PHP submissions are interpreted by ``/usr/bin/php``.
 
-The compilation lines can be inspected and amended in :file:`cms/grading/__init__.py` (there is no way of configuring them apart from changing the source code). Possible amendments are changing the Python version from 2 to 3 (there are instructions in the file on how to do it) or changing the standard used by the GCC.
+* Haskell support is provided by ``ghc``, and submissions are optimized with ``-O2``.
+
+* Rust support is provided by ``rustc``, and submissions are optimized with ``-O``.
+
+* C# uses the system version of the Mono compiler ``mcs`` and the runtime ``mono``. Submissions are optimized with ``-optimize+``.
+
+
+Custom languages
+----------------
+
+Additional languages can be defined if necessary. This works in the same way :ref:`as with task types <tasktypes_custom>`: the classes need to extend :py:class:`cms.grading.language.Language` and the entry point group is called `cms.grading.languages`.

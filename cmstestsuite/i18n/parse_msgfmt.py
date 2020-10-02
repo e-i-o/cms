@@ -1,8 +1,9 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2014 Giovanni Mascellani <mascellani@poisson.phc.unipi.it>
+# Copyright © 2016 Stefano Maggiolo <s.maggiolo@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -18,16 +19,20 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
+import os
 import sys
 
 
 def main():
     for line in sys.stdin:
         filename, data = [x.strip() for x in line.split(':')]
-        filename = filename.strip('.')
+        filename = os.path.basename(filename.strip('.'))
         pieces = [x.strip() for x in data.split(',')]
         stats = {'translated': 0, 'untranslated': 0, 'fuzzy': 0}
         for piece in pieces:

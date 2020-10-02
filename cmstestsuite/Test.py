@@ -1,8 +1,9 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2012 Bernard Blackham <bernard@largestprime.net>
+# Copyright © 2014-2017 Stefano Maggiolo <s.maggiolo@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -18,13 +19,18 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
 import os
 import re
 
-from cmstestsuite import cws_submit, get_evaluation_result
+from cms.grading.languagemanager import get_language
+
+from cmstestsuite.functionaltestframework import FunctionalTestFramework
 
 
 class TestFailure(Exception):
@@ -38,10 +44,10 @@ class Check(object):
 
 class CheckOverallScore(Check):
     # This check searches for a string such :
-    #   Evaluated (100.0 / 100.0)
+    #   Scored (100.0 / 100.0)
     # in status and checks the score.
 
-    score_re = re.compile(r'^Evaluated \(([0-9.]+) / ([0-9/.]+)\)')
+    score_re = re.compile(r'^Scored \(([0-9.]+) / ([0-9/.]+)\)')
 
     def __init__(self, expected_score, expected_total):
         self.expected_score = expected_score
@@ -50,8 +56,10 @@ class CheckOverallScore(Check):
     def check(self, result_info):
         g = CheckOverallScore.score_re.match(result_info['status'])
         if not g:
-            raise TestFailure("Expected total score, got status: %s" %
-                              result_info['status'])
+            raise TestFailure(
+                "Expected total score, got status: %s\n"
+                "Compilation output:\n%s" %
+                (result_info['status'], result_info['compile_output']))
 
         score, total = g.groups()
         try:
@@ -81,7 +89,7 @@ class CheckAbstractEvaluationFailure(Check):
         self.failure_string = failure_string
 
     def check(self, result_info):
-        if 'Evaluated' not in result_info['status']:
+        if 'Scored' not in result_info['status']:
             raise TestFailure("Expected a successful evaluation, got: %s" %
                               result_info['status'])
         if not result_info['evaluations']:
@@ -103,6 +111,13 @@ class CheckTimeout(CheckAbstractEvaluationFailure):
             self, "timed out", "Execution timed out")
 
 
+class CheckTimeoutWall(CheckAbstractEvaluationFailure):
+    def __init__(self):
+        CheckAbstractEvaluationFailure.__init__(
+            self, "wall timed out",
+            "Execution timed out (wall clock limit exceeded)")
+
+
 class CheckForbiddenSyscall(CheckAbstractEvaluationFailure):
     def __init__(self, syscall_name=''):
         CheckAbstractEvaluationFailure.__init__(
@@ -114,7 +129,7 @@ class CheckSignal(CheckAbstractEvaluationFailure):
     def __init__(self, signal_number):
         CheckAbstractEvaluationFailure.__init__(
             self, "died on a signal",
-            "Execution killed with signal %d" % signal_number)
+            "Execution killed with signal %s" % signal_number)
 
 
 class CheckNonzeroReturn(CheckAbstractEvaluationFailure):
@@ -125,28 +140,55 @@ class CheckNonzeroReturn(CheckAbstractEvaluationFailure):
 
 
 class Test(object):
-    def __init__(self, name, task, filename, languages, checks):
+    def __init__(self, name, task, filenames, languages, checks,
+                 user_tests=False):
+        self.framework = FunctionalTestFramework()
+
         self.name = name
         self.task_module = task
-        self.filename = filename
+        self.filenames = filenames
         self.languages = languages
         self.checks = checks
+        submission_format = list(
+            e.strip() for e in task.task_info["submission_format"].split(","))
+        self.submission_format = submission_format
 
-    def run(self, contest_id, task_id, user_id, language):
+        self.user_tests = user_tests
+
+        self.submission_id = {}
+        self.user_test_id = {}
+
+    def _sources_names(self, language):
         # Source files are stored under cmstestsuite/code/.
         path = os.path.join(os.path.dirname(__file__), 'code')
 
         # Choose the correct file to submit.
-        filename = self.filename.replace("%l", language)
+        if language is not None:
+            ext = get_language(language).source_extension
+            filenames = [filename.replace(".%l", ext)
+                         for filename in self.filenames]
+        else:
+            filenames = self.filenames
 
-        full_path = os.path.join(path, filename)
+        full_paths = [os.path.join(path, filename) for filename in filenames]
 
-        # Submit our code.
-        submission_id = cws_submit(contest_id, task_id, user_id,
-                                   full_path, language)
+        return full_paths
+
+    def submit(self, task_id, user_id, language):
+        full_paths = self._sources_names(language)
+        self.submission_id[language] = self.framework.cws_submit(
+            task_id, user_id,
+            self.submission_format, full_paths, language)
+
+    def wait(self, contest_id, language):
+        # This means we were not able to submit, hence the error
+        # should have been already noted.
+        if self.submission_id.get(language) is None:
+            return
 
         # Wait for evaluation to complete.
-        result_info = get_evaluation_result(contest_id, submission_id)
+        result_info = self.framework.get_evaluation_result(
+            contest_id, self.submission_id[language])
 
         # Run checks.
         for check in self.checks:
@@ -155,3 +197,19 @@ class Test(object):
             except TestFailure:
                 # Our caller can deal with these.
                 raise
+
+    def submit_user_test(self, task_id, user_id, language):
+        full_paths = self._sources_names(language)
+        self.user_test_id[language] = self.framework.cws_submit_user_test(
+            task_id, user_id,
+            self.submission_format, full_paths, language)
+
+    def wait_user_test(self, contest_id, language):
+        # This means we were not able to submit, hence the error
+        # should have been already noted.
+        if self.user_test_id.get(language) is None:
+            return
+
+        # Wait for evaluation to complete. We do not do any other check.
+        self.framework.get_user_test_result(
+            contest_id, self.user_test_id[language])

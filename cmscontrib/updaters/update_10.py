@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
@@ -19,7 +19,7 @@
 
 """A class to update a dump created by CMS.
 
-Used by ContestImporter and DumpUpdater.
+Used by DumpImporter and DumpUpdater.
 
 This adapts the dump to some changes in the model introduced in the
 commit that created this same file.
@@ -27,8 +27,12 @@ commit that created this same file.
 """
 
 from __future__ import absolute_import
-from __future__ import unicode_literals
+from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
+from six import iteritems
 
 
 class Updater(object):
@@ -38,7 +42,7 @@ class Updater(object):
         self.objs = data
 
     def run(self):
-        for k, v in self.objs.iteritems():
+        for k, v in iteritems(self.objs):
             if k.startswith("_"):
                 continue
             if v["_class"] == "Contest":
@@ -46,7 +50,7 @@ class Updater(object):
                     # make_timestamp(datetime(2000, 01, 01))
                     v["start"] = 946684800.0
                 if v["stop"] is None:
-                    # make_timestamp(datetime(2100, 01, 01))
-                    v["stop"] = 4102444800.0
+                    # make_timestamp(datetime(2030, 01, 01))
+                    v["stop"] = 1893456000.0
 
         return self.objs

@@ -1,9 +1,10 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2012 Giovanni Mascellani <mascellani@poisson.phc.unipi.it>
-# Copyright © 2012-2013 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2012-2015 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2015-2016 Stefano Maggiolo <s.maggiolo@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -23,16 +24,22 @@
 """
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
 from sqlalchemy.schema import Column, ForeignKey, ForeignKeyConstraint, \
     UniqueConstraint
-from sqlalchemy.types import Integer, Float, String, Unicode, DateTime
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy.types import Integer, Float, String, Unicode, DateTime, \
+    BigInteger
+from sqlalchemy.orm import relationship
+from sqlalchemy.orm.collections import attribute_mapped_collection
+from sqlalchemy.dialects.postgresql import ARRAY
 
-from . import Base, User, Task, Dataset
-from .smartmappedcollection import smart_mapped_collection
+from . import Base, Participation, Task, Dataset, FilenameConstraint, \
+    DigestConstraint
 
 
 class UserTest(Base):
@@ -46,18 +53,17 @@ class UserTest(Base):
         Integer,
         primary_key=True)
 
-    # User (id and object) that requested the test.
-    user_id = Column(
+    # User and Contest, thus Participation (id and object) that did the
+    # submission.
+    participation_id = Column(
         Integer,
-        ForeignKey(User.id,
+        ForeignKey(Participation.id,
                    onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
         index=True)
-    user = relationship(
-        User,
-        backref=backref("user_tests",
-                        cascade="all, delete-orphan",
-                        passive_deletes=True))
+    participation = relationship(
+        Participation,
+        back_populates="user_tests")
 
     # Task (id and object) of the test.
     task_id = Column(
@@ -68,9 +74,7 @@ class UserTest(Base):
         index=True)
     task = relationship(
         Task,
-        backref=backref("user_tests",
-                        cascade="all, delete-orphan",
-                        passive_deletes=True))
+        back_populates="user_tests")
 
     # Time of the request.
     timestamp = Column(
@@ -85,13 +89,31 @@ class UserTest(Base):
     # Input (provided by the user) file's digest for this test.
     input = Column(
         String,
+        DigestConstraint("input"),
         nullable=False)
 
-    # Follows the description of the fields automatically added by
-    # SQLAlchemy.
-    # files (dict of UserTestFile objects indexed by filename)
-    # managers (dict of UserTestManager objects indexed by filename)
-    # results (list of UserTestResult objects)
+    # These one-to-many relationships are the reversed directions of
+    # the ones defined in the "child" classes using foreign keys.
+
+    files = relationship(
+        "UserTestFile",
+        collection_class=attribute_mapped_collection("filename"),
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="user_test")
+
+    managers = relationship(
+        "UserTestManager",
+        collection_class=attribute_mapped_collection("filename"),
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="user_test")
+
+    results = relationship(
+        "UserTestResult",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="user_test")
 
     def get_result(self, dataset=None):
         """Return the result associated to a dataset.
@@ -161,17 +183,16 @@ class UserTestFile(Base):
         index=True)
     user_test = relationship(
         UserTest,
-        backref=backref('files',
-                        collection_class=smart_mapped_collection('filename'),
-                        cascade="all, delete-orphan",
-                        passive_deletes=True))
+        back_populates="files")
 
     # Filename and digest of the submitted file.
     filename = Column(
         String,
+        FilenameConstraint("filename"),
         nullable=False)
     digest = Column(
         String,
+        DigestConstraint("digest"),
         nullable=False)
 
 
@@ -199,17 +220,16 @@ class UserTestManager(Base):
         index=True)
     user_test = relationship(
         UserTest,
-        backref=backref('managers',
-                        collection_class=smart_mapped_collection('filename'),
-                        cascade="all, delete-orphan",
-                        passive_deletes=True))
+        back_populates="managers")
 
     # Filename and digest of the submitted manager.
     filename = Column(
         String,
+        FilenameConstraint("filename"),
         nullable=False)
     digest = Column(
         String,
+        DigestConstraint("digest"),
         nullable=False)
 
 
@@ -217,6 +237,19 @@ class UserTestResult(Base):
     """Class to store the execution results of a user_test.
 
     """
+    # Possible statuses of a user test result. COMPILING and
+    # EVALUATING do not necessarily imply we are going to schedule
+    # compilation and run for these user test results: for
+    # example, they might be for datasets not scheduled for
+    # evaluation, or they might have passed the maximum number of
+    # tries. If a user test result does not exists for a pair
+    # (user test, dataset), its status can be implicitly assumed to
+    # be COMPILING.
+    COMPILING = 1
+    COMPILATION_FAILED = 2
+    EVALUATING = 3
+    EVALUATED = 4
+
     __tablename__ = 'user_test_results'
     __table_args__ = (
         UniqueConstraint('user_test_id', 'dataset_id'),
@@ -230,10 +263,7 @@ class UserTestResult(Base):
         primary_key=True)
     user_test = relationship(
         UserTest,
-        backref=backref(
-            "results",
-            cascade="all, delete-orphan",
-            passive_deletes=True))
+        back_populates="results")
 
     dataset_id = Column(
         Integer,
@@ -248,6 +278,7 @@ class UserTestResult(Base):
     # Output file's digest for this test
     output = Column(
         String,
+        DigestConstraint("output"),
         nullable=True)
 
     # Compilation outcome (can be None = yet to compile, "ok" =
@@ -257,10 +288,13 @@ class UserTestResult(Base):
         String,
         nullable=True)
 
-    # String containing output from the sandbox.
+    # The output from the sandbox (to allow localization the first item
+    # of the list is a format string, possibly containing some "%s",
+    # that will be filled in using the remaining items of the list).
     compilation_text = Column(
-        String,
-        nullable=True)
+        ARRAY(String),
+        nullable=False,
+        default=[])
 
     # Number of attempts of compilation.
     compilation_tries = Column(
@@ -284,7 +318,7 @@ class UserTestResult(Base):
         Float,
         nullable=True)
     compilation_memory = Column(
-        Integer,
+        BigInteger,
         nullable=True)
 
     # Worker shard and sandbox where the compilation was performed.
@@ -300,9 +334,15 @@ class UserTestResult(Base):
     evaluation_outcome = Column(
         String,
         nullable=True)
+
+    # The output from the grader, usually "Correct", "Time limit", ...
+    # (to allow localization the first item of the list is a format
+    # string, possibly containing some "%s", that will be filled in
+    # using the remaining items of the list).
     evaluation_text = Column(
-        String,
-        nullable=True)
+        ARRAY(String),
+        nullable=False,
+        default=[])
 
     # Number of attempts of evaluation.
     evaluation_tries = Column(
@@ -318,7 +358,7 @@ class UserTestResult(Base):
         Float,
         nullable=True)
     execution_memory = Column(
-        Integer,
+        BigInteger,
         nullable=True)
 
     # Worker shard and sandbox where the evaluation was performed.
@@ -329,9 +369,28 @@ class UserTestResult(Base):
         String,
         nullable=True)
 
-    # Follows the description of the fields automatically added by
-    # SQLAlchemy.
-    # executables (dict of UserTestExecutable objects indexed by filename)
+    # These one-to-many relationships are the reversed directions of
+    # the ones defined in the "child" classes using foreign keys.
+
+    executables = relationship(
+        "UserTestExecutable",
+        collection_class=attribute_mapped_collection("filename"),
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="user_test_result")
+
+    def get_status(self):
+        """Return the status of this object.
+
+        """
+        if not self.compiled():
+            return UserTestResult.COMPILING
+        elif self.compilation_failed():
+            return UserTestResult.COMPILATION_FAILED
+        elif not self.evaluated():
+            return UserTestResult.EVALUATING
+        else:
+            return UserTestResult.EVALUATED
 
     def compiled(self):
         """Return whether the user test result has been compiled.
@@ -340,6 +399,13 @@ class UserTestResult(Base):
 
         """
         return self.compilation_outcome is not None
+
+    @staticmethod
+    def filter_compiled():
+        """Return a filtering expression for compiled user test results.
+
+        """
+        return UserTestResult.compilation_outcome.isnot(None)
 
     def compilation_failed(self):
         """Return whether the user test result did not compile.
@@ -351,6 +417,14 @@ class UserTestResult(Base):
         """
         return self.compilation_outcome == "fail"
 
+    @staticmethod
+    def filter_compilation_failed():
+        """Return a filtering expression for user test results failing
+        compilation.
+
+        """
+        return UserTestResult.compilation_outcome == "fail"
+
     def compilation_succeeded(self):
         """Return whether the user test compiled.
 
@@ -361,6 +435,14 @@ class UserTestResult(Base):
         """
         return self.compilation_outcome == "ok"
 
+    @staticmethod
+    def filter_compilation_succeeded():
+        """Return a filtering expression for user test results failing
+        compilation.
+
+        """
+        return UserTestResult.compilation_outcome == "ok"
+
     def evaluated(self):
         """Return whether the user test result has been evaluated.
 
@@ -369,13 +451,20 @@ class UserTestResult(Base):
         """
         return self.evaluation_outcome is not None
 
+    @staticmethod
+    def filter_evaluated():
+        """Return a filtering lambda for evaluated user test results.
+
+        """
+        return UserTestResult.evaluation_outcome.isnot(None)
+
     def invalidate_compilation(self):
         """Blank all compilation and evaluation outcomes.
 
         """
         self.invalidate_evaluation()
         self.compilation_outcome = None
-        self.compilation_text = None
+        self.compilation_text = []
         self.compilation_tries = 0
         self.compilation_time = None
         self.compilation_wall_clock_time = None
@@ -389,7 +478,7 @@ class UserTestResult(Base):
 
         """
         self.evaluation_outcome = None
-        self.evaluation_text = None
+        self.evaluation_text = []
         self.evaluation_tries = 0
         self.execution_time = None
         self.execution_wall_clock_time = None
@@ -440,7 +529,8 @@ class UserTestExecutable(Base):
         nullable=False,
         index=True)
     user_test = relationship(
-        UserTest)
+        UserTest,
+        viewonly=True)
 
     # Dataset (id and object) owning the executable.
     dataset_id = Column(
@@ -450,20 +540,20 @@ class UserTestExecutable(Base):
         nullable=False,
         index=True)
     dataset = relationship(
-        Dataset)
+        Dataset,
+        viewonly=True)
 
     # UserTestResult owning the executable.
     user_test_result = relationship(
         UserTestResult,
-        backref=backref('executables',
-                        collection_class=smart_mapped_collection('filename'),
-                        cascade="all, delete-orphan",
-                        passive_deletes=True))
+        back_populates="executables")
 
     # Filename and digest of the generated executable.
     filename = Column(
         String,
+        FilenameConstraint("filename"),
         nullable=False)
     digest = Column(
         String,
+        DigestConstraint("digest"),
         nullable=False)

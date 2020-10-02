@@ -1,11 +1,11 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2010-2014 Giovanni Mascellani <mascellani@poisson.phc.unipi.it>
-# Copyright © 2010-2012 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2010-2014 Stefano Maggiolo <s.maggiolo@gmail.com>
 # Copyright © 2010-2012 Matteo Boscariol <boscarim@hotmail.com>
-# Copyright © 2012-2014 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2012-2018 Luca Wehrstedt <luca.wehrstedt@gmail.com>
 # Copyright © 2013 Bernard Blackham <bernard@largestprime.net>
 #
 # This program is free software: you can redistribute it and/or modify
@@ -26,20 +26,30 @@
 """
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
+from six import itervalues, iteritems
 
+import copy
 from datetime import timedelta
 
 from sqlalchemy.schema import Column, ForeignKey, CheckConstraint, \
     UniqueConstraint, ForeignKeyConstraint
 from sqlalchemy.types import Boolean, Integer, Float, String, Unicode, \
-    Interval, Enum
-from sqlalchemy.orm import relationship, backref
-from sqlalchemy.ext.orderinglist import ordering_list
+    Interval, Enum, BigInteger
+from sqlalchemy.orm import relationship
+from sqlalchemy.orm.collections import attribute_mapped_collection
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 
-from . import Base, Contest
-from .smartmappedcollection import smart_mapped_collection
+from cms import SCORE_MODE_MAX, SCORE_MODE_MAX_TOKENED_LAST, \
+    TOKEN_MODE_DISABLED, TOKEN_MODE_FINITE, TOKEN_MODE_INFINITE
+from cms.db.validation import FilenameListConstraint
+
+from . import Base, Contest, CodenameConstraint, FilenameConstraint, \
+    DigestConstraint
 
 
 class Task(Base):
@@ -74,37 +84,43 @@ class Task(Base):
     # Number of the task for sorting.
     num = Column(
         Integer,
-        nullable=False)
+        nullable=True)
 
     # Contest (id and object) owning the task.
     contest_id = Column(
         Integer,
         ForeignKey(Contest.id,
                    onupdate="CASCADE", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True)
     contest = relationship(
         Contest,
-        backref=backref('tasks',
-                        collection_class=ordering_list('num'),
-                        order_by=[num],
-                        cascade="all, delete-orphan",
-                        passive_deletes=True))
+        back_populates="tasks")
 
     # Short name and long human readable title of the task.
     name = Column(
         Unicode,
-        nullable=False)
+        CodenameConstraint("name"),
+        nullable=False,
+        unique=True)
     title = Column(
         Unicode,
         nullable=False)
 
-    # A JSON-encoded lists of strings: the language codes of the
-    # statements that will be highlighted to all users for this task.
-    primary_statements = Column(
-        String,
+    # The names of the files that the contestant needs to submit (with
+    # language-specific extensions replaced by "%l").
+    submission_format = Column(
+        ARRAY(String),
+        FilenameListConstraint("submission_format"),
         nullable=False,
-        default="[]")
+        default=[])
+
+    # The language codes of the statements that will be highlighted to
+    # all users for this task.
+    primary_statements = Column(
+        ARRAY(String),
+        nullable=False,
+        default=[])
 
     # The parameters that control task-tokens follow. Note that their
     # effect during the contest depends on the interaction with the
@@ -118,7 +134,8 @@ class Task(Base):
     #   contest instead.
     # - infinite: The user will always be able to use a token.
     token_mode = Column(
-        Enum("disabled", "finite", "infinite", name="token_mode"),
+        Enum(TOKEN_MODE_DISABLED, TOKEN_MODE_FINITE, TOKEN_MODE_INFINITE,
+             name="token_mode"),
         nullable=False,
         default="disabled")
 
@@ -126,7 +143,7 @@ class Task(Base):
     # during the whole contest (on this tasks).
     token_max_number = Column(
         Integer,
-        CheckConstraint("token_max_number > 0"),
+        CheckConstraint("token_max_number > -1"),
         nullable=True)
 
     # The minimum interval between two successive uses of tokens for
@@ -157,7 +174,7 @@ class Task(Base):
         default=timedelta(minutes=30))
     token_gen_max = Column(
         Integer,
-        CheckConstraint("token_gen_max > 0"),
+        CheckConstraint("token_gen_max > -1"),
         nullable=True)
 
     # Maximum number of submissions or user_tests allowed for each user
@@ -191,6 +208,13 @@ class Task(Base):
         nullable=False,
         default=0)
 
+    # Score mode for the task.
+    score_mode = Column(
+        Enum(SCORE_MODE_MAX_TOKENED_LAST, SCORE_MODE_MAX,
+             name="score_mode"),
+        nullable=False,
+        default=SCORE_MODE_MAX_TOKENED_LAST)
+
     # Active Dataset (id and object) currently being used for scoring.
     # The ForeignKeyConstraint for this column is set at table-level.
     active_dataset_id = Column(
@@ -199,21 +223,48 @@ class Task(Base):
     active_dataset = relationship(
         'Dataset',
         foreign_keys=[active_dataset_id],
-        # XXX In SQLAlchemy 0.8 we could remove this:
-        primaryjoin='Task.active_dataset_id == Dataset.id',
         # Use an UPDATE query *after* an INSERT query (and *before* a
         # DELETE query) to set (and unset) the column associated to
         # this relationship.
         post_update=True)
 
-    # Follows the description of the fields automatically added by
-    # SQLAlchemy.
-    # datasets (list of Dataset objects)
-    # statements (dict of Statement objects indexed by language code)
-    # attachments (dict of Attachment objects indexed by filename)
-    # submission_format (list of SubmissionFormatElement objects)
-    # submissions (list of Submission objects)
-    # user_tests (list of UserTest objects)
+    # These one-to-many relationships are the reversed directions of
+    # the ones defined in the "child" classes using foreign keys.
+
+    statements = relationship(
+        "Statement",
+        collection_class=attribute_mapped_collection("language"),
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="task")
+
+    attachments = relationship(
+        "Attachment",
+        collection_class=attribute_mapped_collection("filename"),
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="task")
+
+    datasets = relationship(
+        "Dataset",
+        # Due to active_dataset_id, SQLAlchemy cannot unambiguously
+        # figure out by itself which foreign key to use.
+        foreign_keys="[Dataset.task_id]",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="task")
+
+    submissions = relationship(
+        "Submission",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="task")
+
+    user_tests = relationship(
+        "UserTest",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="task")
 
 
 class Statement(Base):
@@ -239,10 +290,7 @@ class Statement(Base):
         index=True)
     task = relationship(
         Task,
-        backref=backref('statements',
-                        collection_class=smart_mapped_collection('language'),
-                        cascade="all, delete-orphan",
-                        passive_deletes=True))
+        back_populates="statements")
 
     # Code for the language the statement is written in.
     # It can be an arbitrary string, but if it's in the form "en" or "en_US"
@@ -256,6 +304,7 @@ class Statement(Base):
     # Digest of the file.
     digest = Column(
         String,
+        DigestConstraint("digest"),
         nullable=False)
 
 
@@ -283,49 +332,16 @@ class Attachment(Base):
         index=True)
     task = relationship(
         Task,
-        backref=backref('attachments',
-                        collection_class=smart_mapped_collection('filename'),
-                        cascade="all, delete-orphan",
-                        passive_deletes=True))
+        back_populates="attachments")
 
     # Filename and digest of the provided attachment.
     filename = Column(
         Unicode,
+        FilenameConstraint("filename"),
         nullable=False)
     digest = Column(
         String,
-        nullable=False)
-
-
-class SubmissionFormatElement(Base):
-    """Class to store the requested files that a submission must
-    include. Filenames may include %l to represent an accepted
-    language extension.
-
-    """
-    __tablename__ = 'submission_format_elements'
-
-    # Auto increment primary key.
-    id = Column(
-        Integer,
-        primary_key=True)
-
-    # Task (id and object) owning the submission format element.
-    task_id = Column(
-        Integer,
-        ForeignKey(Task.id,
-                   onupdate="CASCADE", ondelete="CASCADE"),
-        nullable=False,
-        index=True)
-    task = relationship(
-        Task,
-        backref=backref('submission_format',
-                        cascade="all, delete-orphan",
-                        passive_deletes=True))
-
-    # Format of the given submission file.
-    filename = Column(
-        Unicode,
+        DigestConstraint("digest"),
         nullable=False)
 
 
@@ -355,11 +371,7 @@ class Dataset(Base):
     task = relationship(
         Task,
         foreign_keys=[task_id],
-        # XXX In SQLAlchemy 0.8 we could remove this:
-        primaryjoin='Task.id == Dataset.task_id',
-        backref=backref('datasets',
-                        cascade="all, delete-orphan",
-                        passive_deletes=True))
+        back_populates="datasets")
 
     # A human-readable text describing the dataset.
     description = Column(
@@ -376,9 +388,16 @@ class Dataset(Base):
     # Time and memory limits for every testcase.
     time_limit = Column(
         Float,
+        CheckConstraint("time_limit > 0"),
         nullable=True)
+
+    time_limit_python = Column(
+            Float,
+            nullable=True)
+
     memory_limit = Column(
-        Integer,
+        BigInteger,
+        CheckConstraint("memory_limit > 0"),
         nullable=True)
 
     # Name of the TaskType child class suited for the task.
@@ -386,9 +405,9 @@ class Dataset(Base):
         String,
         nullable=False)
 
-    # Parameters for the task type class, JSON encoded.
+    # Parameters for the task type class.
     task_type_parameters = Column(
-        String,
+        JSONB,
         nullable=False)
 
     # Name of the ScoreType child class suited for the task.
@@ -396,15 +415,27 @@ class Dataset(Base):
         String,
         nullable=False)
 
-    # Parameters for the score type class, JSON encoded.
+    # Parameters for the score type class.
     score_type_parameters = Column(
-        String,
+        JSONB,
         nullable=False)
 
-    # Follows the description of the fields automatically added by
-    # SQLAlchemy.
-    # managers (dict of Manager objects indexed by filename)
-    # testcases (dict of Testcase objects indexed by codename)
+    # These one-to-many relationships are the reversed directions of
+    # the ones defined in the "child" classes using foreign keys.
+
+    managers = relationship(
+        "Manager",
+        collection_class=attribute_mapped_collection("filename"),
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="dataset")
+
+    testcases = relationship(
+        "Testcase",
+        collection_class=attribute_mapped_collection("codename"),
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="dataset")
 
     @property
     def active(self):
@@ -415,6 +446,95 @@ class Dataset(Base):
 
         """
         return self is self.task.active_dataset
+
+    @property
+    def task_type_object(self):
+        if not hasattr(self, "_cached_task_type_object") \
+                or self.task_type != self._cached_task_type \
+                or self.task_type_parameters \
+                   != self._cached_task_type_parameters:
+            # Import late to avoid a circular dependency.
+            from cms.grading.tasktypes import get_task_type
+            # This can raise.
+            self._cached_task_type_object = get_task_type(
+                self.task_type, self.task_type_parameters)
+            # If an exception is raised these updates don't take place:
+            # that way, next time this property is accessed, we get a
+            # cache miss again and the same exception is raised again.
+            self._cached_task_type = self.task_type
+            self._cached_task_type_parameters = \
+                copy.deepcopy(self.task_type_parameters)
+        return self._cached_task_type_object
+
+    @property
+    def score_type_object(self):
+        public_testcases = {k: tc.public for k, tc in iteritems(self.testcases)}
+        if not hasattr(self, "_cached_score_type_object") \
+                or self.score_type != self._cached_score_type \
+                or self.score_type_parameters \
+                   != self._cached_score_type_parameters \
+                or public_testcases != self._cached_public_testcases:
+            # Import late to avoid a circular dependency.
+            from cms.grading.scoretypes import get_score_type
+            # This can raise.
+            self._cached_score_type_object = get_score_type(
+                self.score_type, self.score_type_parameters, public_testcases)
+            # If an exception is raised these updates don't take place:
+            # that way, next time this property is accessed, we get a
+            # cache miss again and the same exception is raised again.
+            self._cached_score_type = self.score_type
+            self._cached_score_type_parameters = \
+                copy.deepcopy(self.score_type_parameters)
+            self._cached_public_testcases = public_testcases
+        return self._cached_score_type_object
+
+    def clone_from(self, old_dataset, clone_managers=True,
+                   clone_testcases=True, clone_results=False):
+        """Overwrite the data with that in dataset.
+
+        old_dataset (Dataset): original dataset to copy from.
+        clone_managers (bool): copy dataset managers.
+        clone_testcases (bool): copy dataset testcases.
+        clone_results (bool): copy submission results (will also copy
+            managers and testcases).
+
+        """
+        new_testcases = dict()
+        if clone_testcases or clone_results:
+            for old_t in itervalues(old_dataset.testcases):
+                new_t = old_t.clone()
+                new_t.dataset = self
+                new_testcases[new_t.codename] = new_t
+
+        if clone_managers or clone_results:
+            for old_m in itervalues(old_dataset.managers):
+                new_m = old_m.clone()
+                new_m.dataset = self
+
+        # TODO: why is this needed?
+        self.sa_session.flush()
+
+        if clone_results:
+            old_results = self.get_submission_results(old_dataset)
+
+            for old_sr in old_results:
+                # Create the submission result.
+                new_sr = old_sr.clone()
+                new_sr.submission = old_sr.submission
+                new_sr.dataset = self
+
+                # Create executables.
+                for old_e in itervalues(old_sr.executables):
+                    new_e = old_e.clone()
+                    new_e.submission_result = new_sr
+
+                # Create evaluations.
+                for old_e in old_sr.evaluations:
+                    new_e = old_e.clone()
+                    new_e.submission_result = new_sr
+                    new_e.testcase = new_testcases[old_e.codename]
+
+        self.sa_session.flush()
 
 
 class Manager(Base):
@@ -441,17 +561,16 @@ class Manager(Base):
         index=True)
     dataset = relationship(
         Dataset,
-        backref=backref('managers',
-                        collection_class=smart_mapped_collection('filename'),
-                        cascade="all, delete-orphan",
-                        passive_deletes=True))
+        back_populates="managers")
 
     # Filename and digest of the provided manager.
     filename = Column(
         Unicode,
+        FilenameConstraint("filename"),
         nullable=False)
     digest = Column(
         String,
+        DigestConstraint("digest"),
         nullable=False)
 
 
@@ -478,14 +597,12 @@ class Testcase(Base):
         index=True)
     dataset = relationship(
         Dataset,
-        backref=backref('testcases',
-                        collection_class=smart_mapped_collection('codename'),
-                        cascade="all, delete-orphan",
-                        passive_deletes=True))
+        back_populates="testcases")
 
     # Codename identifying the testcase.
     codename = Column(
         Unicode,
+        CodenameConstraint("codename"),
         nullable=False)
 
     # If the testcase outcome is going to be showed to the user (even
@@ -498,7 +615,9 @@ class Testcase(Base):
     # Digests of the input and output files.
     input = Column(
         String,
+        DigestConstraint("input"),
         nullable=False)
     output = Column(
         String,
+        DigestConstraint("output"),
         nullable=False)

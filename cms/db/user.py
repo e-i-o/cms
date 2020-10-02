@@ -1,11 +1,13 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2010-2012 Giovanni Mascellani <mascellani@poisson.phc.unipi.it>
-# Copyright © 2010-2012 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2010-2015 Stefano Maggiolo <s.maggiolo@gmail.com>
 # Copyright © 2010-2012 Matteo Boscariol <boscarim@hotmail.com>
-# Copyright © 2012-2014 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2012-2018 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2015 William Di Luigi <williamdiluigi@gmail.com>
+# Copyright © 2016 Myungwoo Chun <mc.tamaki@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -25,8 +27,11 @@
 """
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
 from datetime import timedelta
 
@@ -34,27 +39,20 @@ from sqlalchemy.schema import Column, ForeignKey, CheckConstraint, \
     UniqueConstraint
 from sqlalchemy.types import Boolean, Integer, String, Unicode, DateTime, \
     Interval
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import ARRAY, CIDR
 
-from . import Base, Contest
+from cmscommon.crypto import generate_random_password, build_password
 
-
-def generate_random_password():
-    import random
-    chars = "abcdefghijklmnopqrstuvwxyz"
-    return "".join([random.choice(chars) for _ in xrange(6)])
+from . import Base, Contest, CastingArray, CodenameConstraint
 
 
 class User(Base):
-    """Class to store a 'user participating in a contest'.
+    """Class to store a user.
 
     """
-    # TODO: we really need to split this as a user (as in: not paired
-    # with a contest) and a participation.
+
     __tablename__ = 'users'
-    __table_args__ = (
-        UniqueConstraint('contest_id', 'username'),
-    )
 
     # Auto increment primary key.
     id = Column(
@@ -72,48 +70,18 @@ class User(Base):
     # Username and password to log in the CWS.
     username = Column(
         Unicode,
-        nullable=False)
+        CodenameConstraint("username"),
+        nullable=False,
+        unique=True)
     password = Column(
         Unicode,
         nullable=False,
-        default=generate_random_password)
+        default=lambda: build_password(generate_random_password()))
 
     # Email for any communications in case of remote contest.
     email = Column(
         Unicode,
         nullable=True)
-
-    # User can log in CWS only from this IP address or subnet.
-    ip = Column(
-        Unicode,
-        nullable=True)
-
-    # A hidden user is used only for debugging purpose.
-    hidden = Column(
-        Boolean,
-        nullable=False,
-        default=False)
-
-    # Contest (id and object) to which the user is participating.
-    contest_id = Column(
-        Integer,
-        ForeignKey(Contest.id,
-                   onupdate="CASCADE", ondelete="CASCADE"),
-        nullable=False,
-        index=True)
-    contest = relationship(
-        Contest,
-        backref=backref("users",
-                        cascade="all, delete-orphan",
-                        passive_deletes=True))
-
-    # A JSON-encoded dictionary of lists of strings: statements["a"]
-    # contains the language codes of the statements that will be
-    # highlighted to this user for task "a".
-    primary_statements = Column(
-        String,
-        nullable=False,
-        default="{}")
 
     # Timezone for the user. All timestamps in CWS will be shown using
     # the timezone associated to the logged-in user or (if it's None
@@ -125,9 +93,87 @@ class User(Base):
         Unicode,
         nullable=True)
 
+    # The language codes accepted by this user (from the "most
+    # preferred" to the "least preferred"). If in a contest there is a
+    # statement available in some of these languages, then the most
+    # preferred of them will be highlighted.
+    # FIXME: possibly move it to Participation and change it back to
+    # primary_statements
+    preferred_languages = Column(
+        ARRAY(String),
+        nullable=False,
+        default=[])
+
+    # These one-to-many relationships are the reversed directions of
+    # the ones defined in the "child" classes using foreign keys.
+
+    participations = relationship(
+        "Participation",
+        cascade = "all, delete-orphan",
+        passive_deletes = True,
+        back_populates="user")
+
+
+class Team(Base):
+    """Class to store a team.
+
+    A team is a way of grouping the users participating in a contest.
+    This grouping has no effect on the contest itself; it is only used
+    for display purposes in RWS.
+
+    """
+
+    __tablename__ = 'teams'
+
+    # Auto increment primary key.
+    id = Column(
+        Integer,
+        primary_key=True)
+
+    # Team code (e.g. the ISO 3166-1 code of a country)
+    code = Column(
+        Unicode,
+        CodenameConstraint("code"),
+        nullable=False,
+        unique=True)
+
+    # Human readable team name (e.g. the ISO 3166-1 short name of a country)
+    name = Column(
+        Unicode,
+        nullable=False)
+
+    participations = relationship(
+        "Participation",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="team")
+
+    # TODO: decide if the flag images will eventually be stored here.
+    # TODO: (hopefully, the same will apply for faces in User).
+
+
+class Participation(Base):
+    """Class to store a single participation of a user in a contest.
+
+    """
+    __tablename__ = 'participations'
+
+    # Auto increment primary key.
+    id = Column(
+        Integer,
+        primary_key=True)
+
+    # If the IP lock is enabled the user can log into CWS only if their
+    # requests come from an IP address that belongs to any of these
+    # subnetworks. An empty list prevents the user from logging in,
+    # None disables the IP lock for the user.
+    ip = Column(
+        CastingArray(CIDR),
+        nullable=True)
+
     # Starting time: for contests where every user has at most x hours
     # of the y > x hours totally available, this is the time the user
-    # decided to start his/her time-frame.
+    # decided to start their time-frame.
     starting_time = Column(
         DateTime,
         nullable=True)
@@ -147,15 +193,97 @@ class User(Base):
         nullable=False,
         default=timedelta())
 
-    # Follows the description of the fields automatically added by
-    # SQLAlchemy.
-    # messages (list of Message objects)
-    # questions (list of Question objects)
-    # submissions (list of Submission objects)
-    # user_tests (list of UserTest objects)
+    # Contest-specific password. If this password is not null then the
+    # traditional user.password field will be "replaced" by this field's
+    # value (only for this participation).
+    password = Column(
+        Unicode,
+        nullable=True)
 
-    # Moreover, we have the following methods.
-    # get_tokens (defined in __init__.py)
+    # A hidden participation (e.g. does not appear in public rankings), can
+    # also be used for debugging purposes.
+    hidden = Column(
+        Boolean,
+        nullable=False,
+        default=False)
+
+    # An unrestricted participation (e.g. contest time,
+    # maximum number of submissions, minimum interval between submissions,
+    # maximum number of user tests, minimum interval between user tests),
+    # can also be used for debugging purposes.
+    unrestricted = Column(
+        Boolean,
+        nullable=False,
+        default=False)
+
+    # Contest (id and object) to which the user is participating.
+    contest_id = Column(
+        Integer,
+        ForeignKey(Contest.id,
+                   onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+        index=True)
+    contest = relationship(
+        Contest,
+        back_populates="participations")
+
+    # User (id and object) which is participating.
+    user_id = Column(
+        Integer,
+        ForeignKey(User.id,
+                   onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+        index=True)
+    user = relationship(
+        User,
+        back_populates="participations")
+    __table_args__ = (UniqueConstraint('contest_id', 'user_id'),)
+
+    # Team (id and object) that the user is representing with this
+    # participation.
+    team_id = Column(
+        Integer,
+        ForeignKey(Team.id,
+                   onupdate="CASCADE", ondelete="RESTRICT"),
+        nullable=True)
+    team = relationship(
+        Team,
+        back_populates="participations")
+
+    # These one-to-many relationships are the reversed directions of
+    # the ones defined in the "child" classes using foreign keys.
+
+    messages = relationship(
+        "Message",
+        order_by="[Message.timestamp]",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="participation")
+
+    questions = relationship(
+        "Question",
+        order_by="[Question.question_timestamp, Question.reply_timestamp]",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="participation")
+
+    submissions = relationship(
+        "Submission",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="participation")
+
+    user_tests = relationship(
+        "UserTest",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="participation")
+
+    printjobs = relationship(
+        "PrintJob",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="participation")
 
 
 class Message(Base):
@@ -183,19 +311,16 @@ class Message(Base):
         Unicode,
         nullable=False)
 
-    # User (id and object) owning the message.
-    user_id = Column(
+    # Participation (id and object) owning the message.
+    participation_id = Column(
         Integer,
-        ForeignKey(User.id,
+        ForeignKey(Participation.id,
                    onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
         index=True)
-    user = relationship(
-        User,
-        backref=backref('messages',
-                        order_by=[timestamp],
-                        cascade="all, delete-orphan",
-                        passive_deletes=True))
+    participation = relationship(
+        Participation,
+        back_populates="messages")
 
 
 class Question(Base):
@@ -204,6 +329,9 @@ class Question(Base):
 
     """
     __tablename__ = 'questions'
+
+    MAX_SUBJECT_LENGTH = 50
+    MAX_TEXT_LENGTH = 2000
 
     # Auto increment primary key.
     id = Column(
@@ -243,16 +371,13 @@ class Question(Base):
         Unicode,
         nullable=True)
 
-    # User (id and object) owning the question.
-    user_id = Column(
+    # Participation (id and object) owning the question.
+    participation_id = Column(
         Integer,
-        ForeignKey(User.id,
+        ForeignKey(Participation.id,
                    onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
         index=True)
-    user = relationship(
-        User,
-        backref=backref('questions',
-                        order_by=[question_timestamp, reply_timestamp],
-                        cascade="all, delete-orphan",
-                        passive_deletes=True))
+    participation = relationship(
+        Participation,
+        back_populates="questions")

@@ -1,9 +1,9 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
-# Copyright © 2010-2014 Giovanni Mascellani <mascellani@poisson.phc.unipi.it>
-# Copyright © 2010-2013 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2010-2015 Giovanni Mascellani <mascellani@poisson.phc.unipi.it>
+# Copyright © 2010-2018 Stefano Maggiolo <s.maggiolo@gmail.com>
 # Copyright © 2010-2012 Matteo Boscariol <boscarim@hotmail.com>
 # Copyright © 2014 Luca Wehrstedt <luca.wehrstedt@gmail.com>
 #
@@ -21,25 +21,28 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
+from six import iteritems, with_metaclass
 
 import io
 import logging
 import os
-import re
 import resource
 import select
 import stat
 import tempfile
+import zipfile
+from abc import ABCMeta, abstractmethod
 from functools import wraps, partial
 
 import gevent
 from gevent import subprocess
-#import gevent_subprocess as subprocess
 
-from cms import config
-from cms.io.GeventUtils import copyfileobj, rmtree
+from cms import config, rmtree
 from cmscommon.commands import pretty_print_cmdline
 from cmscommon.datetime import monotonic_time
 
@@ -175,12 +178,12 @@ class Truncator(io.RawIOBase):
         """See io.IOBase.tell."""
         return self.fobj.tell()
 
-    def write(self, b):
+    def write(self, _):
         """See io.RawIOBase.write."""
         raise io.UnsupportedOperation('write')
 
 
-class SandboxBase(object):
+class SandboxBase(with_metaclass(ABCMeta, object)):
     """A base class for all sandboxes, meant to contain common
     resources.
 
@@ -190,18 +193,55 @@ class SandboxBase(object):
     EXIT_OK = 'ok'
     EXIT_SIGNAL = 'signal'
     EXIT_TIMEOUT = 'timeout'
-    EXIT_FILE_ACCESS = 'file access'
-    EXIT_SYSCALL = 'syscall'
+    EXIT_TIMEOUT_WALL = 'wall timeout'
     EXIT_NONZERO_RETURN = 'nonzero return'
 
-    def __init__(self, file_cacher):
+    def __init__(self, file_cacher, name=None, temp_dir=None):
         """Initialization.
 
         file_cacher (FileCacher): an instance of the FileCacher class
             (to interact with FS), if the sandbox needs it.
+        name (string|None): name of the sandbox, which might appear in the
+            path and in system logs.
+        temp_dir (unicode|None): temporary directory to use; if None, use the
+            default temporary directory specified in the configuration.
 
         """
         self.file_cacher = file_cacher
+        self.name = name if name is not None else "unnamed"
+        self.temp_dir = temp_dir if temp_dir is not None else config.temp_dir
+
+        self.cmd_file = "commands.log"
+
+        # These are not necessarily used, but are here for API compatibility
+        # TODO: move all other common properties here.
+        self.box_id = 0
+        self.fsize = None
+        self.cgroup = False
+        self.dirs = []
+        self.preserve_env = False
+        self.inherit_env = []
+        self.set_env = {}
+        self.verbosity = 0
+
+        self.max_processes = 1
+
+        # Set common environment variables.
+        # Specifically needed by Python, that searches the home for
+        # packages.
+        self.set_env["HOME"] = "./"
+
+    def set_multiprocess(self, multiprocess):
+        """Set the sandbox to (dis-)allow multiple threads and processes.
+
+        multiprocess (bool): whether to allow multiple thread/processes or not.
+
+        """
+        if multiprocess:
+            # Max processes is set to 1000 to limit the effect of fork bombs.
+            self.max_processes = 1000
+        else:
+            self.max_processes = 1
 
     def get_stats(self):
         """Return a human-readable string representing execution time
@@ -222,39 +262,70 @@ class SandboxBase(object):
             mem_str = "(memory usage unknown)"
         return "[%s - %s]" % (time_str, mem_str)
 
+    @abstractmethod
     def get_root_path(self):
         """Return the toplevel path of the sandbox.
 
         return (string): the root path.
 
-        raise (NotImplementedError): if the subclass does not
-            implement this method.
-
         """
-        raise NotImplementedError("Subclasses must implement get_root_path.")
+        pass
 
+    @abstractmethod
     def get_execution_time(self):
         """Return the time spent in the sandbox.
 
         return (float): time spent in the sandbox.
 
-        raise (NotImplementedError): if the subclass does not
-            implement this method.
-
         """
-        raise NotImplementedError(
-            "Subclasses must implement get_execution_time.")
+        pass
 
+    @abstractmethod
     def get_memory_used(self):
         """Return the memory used by the sandbox.
 
         return (int): memory used by the sandbox (in bytes).
 
-        raise (NotImplementedError): if the subclass does not
-            implement this method.
+        """
+        pass
+
+    @abstractmethod
+    def get_killing_signal(self):
+        """Return the signal that killed the sandboxed process.
+
+        return (int): offending signal, or 0.
 
         """
-        raise NotImplementedError("Subclasses must implement get_memory_used.")
+        pass
+
+    @abstractmethod
+    def get_exit_status(self):
+        """Get information about how the sandbox terminated.
+
+        return (string): the main reason why the sandbox terminated.
+
+        """
+        pass
+
+    @abstractmethod
+    def get_exit_code(self):
+        """Return the exit code of the sandboxed process.
+
+        return (float): exitcode, or 0.
+
+        """
+        pass
+
+    @abstractmethod
+    def get_human_exit_description(self):
+        """Get the status of the sandbox and return a human-readable
+        string describing it.
+
+        return (string): human-readable explaination of why the
+                         sandbox terminated.
+
+        """
+        pass
 
     def relative_path(self, path):
         """Translate from a relative path inside the sandbox to a
@@ -282,7 +353,14 @@ class SandboxBase(object):
         else:
             logger.debug("Creating plain file %s in sandbox.", path)
         real_path = self.relative_path(path)
-        file_ = io.open(real_path, "wb")
+        try:
+            file_fd = os.open(real_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            file_ = io.open(file_fd, "wb")
+        except OSError as e:
+            logger.error("Failed create file %s in sandbox. Unable to "
+                         "evalulate this submission. This may be due to "
+                         "cheating. %s", real_path, e, exc_info=True)
+            raise
         mod = stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH | stat.S_IWUSR
         if executable:
             mod |= stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
@@ -297,9 +375,8 @@ class SandboxBase(object):
         executable (bool): to set permissions.
 
         """
-        file_ = self.create_file(path, executable)
-        self.file_cacher.get_file_to_fobj(digest, file_)
-        file_.close()
+        with self.create_file(path, executable) as dest_fobj:
+            self.file_cacher.get_file_to_fobj(digest, dest_fobj)
 
     def create_file_from_string(self, path, content, executable=False):
         """Write some data to a file in the sandbox.
@@ -309,27 +386,13 @@ class SandboxBase(object):
         executable (bool): to set permissions.
 
         """
-        file_ = self.create_file(path, executable)
-        file_.write(content)
-        file_.close()
-
-    def create_file_from_fileobj(self, path, file_obj, executable=False):
-        """Write a file in the sandbox copying the content of an open
-        file-like object.
-
-        path (string): relative path of the file inside the sandbox.
-        file_obj (file): where from read the file content.
-        executable (bool): to set permissions.
-
-        """
-        dest = self.create_file(path, executable)
-        copyfileobj(file_obj, dest)
-        dest.close()
+        with self.create_file(path, executable) as dest_fobj:
+            dest_fobj.write(content)
 
     def get_file(self, path, trunc_len=None):
         """Open a file in the sandbox given its relative path.
 
-        path (string): relative path of the file inside the sandbox.
+        path (str): relative path of the file inside the sandbox.
         trunc_len (int|None): if None, does nothing; otherwise, before
             returning truncate it at the specified length.
 
@@ -343,45 +406,55 @@ class SandboxBase(object):
             file_ = Truncator(file_, trunc_len)
         return file_
 
+    def get_file_text(self, path, trunc_len=None):
+        """Open a file in the sandbox given its relative path, in text mode.
+
+        Assumes encoding is UTF-8. The caller must handle decoding errors.
+
+        path (str): relative path of the file inside the sandbox.
+        trunc_len (int|None): if None, does nothing; otherwise, before
+            returning truncate it at the specified length.
+
+        return (file): the file opened in read binary mode.
+
+        """
+        logger.debug("Retrieving text file %s from sandbox.", path)
+        real_path = self.relative_path(path)
+        file_ = io.open(real_path, "rt", encoding="utf-8")
+        if trunc_len is not None:
+            file_ = Truncator(file_, trunc_len)
+        return file_
+
     def get_file_to_string(self, path, maxlen=1024):
         """Return the content of a file in the sandbox given its
         relative path.
 
-        path (string): relative path of the file inside the sandbox.
+        path (str): relative path of the file inside the sandbox.
         maxlen (int): maximum number of bytes to read, or None if no
             limit.
 
         return (string): the content of the file up to maxlen bytes.
 
         """
-        file_ = self.get_file(path)
-        try:
+        with self.get_file(path) as file_:
             if maxlen is None:
-                content = file_.read()
+                return file_.read()
             else:
-                content = file_.read(maxlen)
-        except UnicodeDecodeError:
-            logger.error("Unable to interpret file as UTF-8.",
-                         exc_info=True)
-            return None
-        file_.close()
-        return content
+                return file_.read(maxlen)
 
     def get_file_to_storage(self, path, description="", trunc_len=None):
         """Put a sandbox file in FS and return its digest.
 
-        path (string): relative path of the file inside the sandbox.
-        description (string): the description for FS.
+        path (str): relative path of the file inside the sandbox.
+        description (str): the description for FS.
         trunc_len (int|None): if None, does nothing; otherwise, before
             returning truncate it at the specified length.
 
-        return (string): the digest of the file.
+        return (str): the digest of the file.
 
         """
-        file_ = self.get_file(path, trunc_len=trunc_len)
-        digest = self.file_cacher.put_file_from_fobj(file_, description)
-        file_.close()
-        return digest
+        with self.get_file(path, trunc_len=trunc_len) as file_:
+            return self.file_cacher.put_file_from_fobj(file_, description)
 
     def stat_file(self, path):
         """Return the stats of a file in the sandbox.
@@ -411,6 +484,79 @@ class SandboxBase(object):
         """
         os.remove(self.relative_path(path))
 
+    @abstractmethod
+    def execute_without_std(self, command, wait=False):
+        """Execute the given command in the sandbox using
+        subprocess.Popen and discarding standard input, output and
+        error. More specifically, the standard input gets closed just
+        after the execution has started; standard output and error are
+        read until the end, in a way that prevents the execution from
+        being blocked because of insufficient buffering.
+
+        command ([string]): executable filename and arguments of the
+            command.
+        wait (bool): True if this call is blocking, False otherwise
+
+        return (bool|Popen): if the call is blocking, then return True
+            if the sandbox didn't report errors (caused by the sandbox
+            itself), False otherwise; if the call is not blocking,
+            return the Popen object from subprocess.
+
+        """
+        pass
+
+    @abstractmethod
+    def translate_box_exitcode(self, _):
+        """Translate the sandbox exit code to a boolean sandbox success.
+
+        _ (int): the exit code of the sandbox.
+
+        return (bool): False if the sandbox had an error, True if it
+            terminated correctly (regardless of what the internal process
+            did).
+
+        """
+        pass
+
+    @abstractmethod
+    def cleanup(self):
+        """Cleanup the sandbox.
+
+        To be called at the end of the execution, regardless of
+        whether the sandbox should be deleted or not.
+
+        """
+        pass
+
+    def archive(self):
+        """Archive the directory where the sandbox operated.
+
+        """
+        logger.info("Archiving sandbox in %s.", self.get_root_path())
+
+        # Archive the working directory
+        sandbox_archive_filename = "sandbox.zip"
+        sandbox_archive = self.relative_path(sandbox_archive_filename)
+        content_path = self.get_root_path()
+        with zipfile.ZipFile(sandbox_archive, "w") as zip_file:
+            for root, dirs, files in os.walk(content_path):
+                if sandbox_archive_filename in files:
+                    files.remove(sandbox_archive_filename)
+                zip_file.write(root, os.path.relpath(root, content_path))
+                for f in files:
+                    f_path = os.path.join(root, f)
+                    zip_file.write(f_path, os.path.relpath(f_path, content_path))
+
+        # Put archive to FS
+        return self.get_file_to_storage(sandbox_archive, "Sandbox %s" % self.path)
+
+    @abstractmethod
+    def delete(self):
+        """Delete the directory where the sandbox operated.
+
+        """
+        pass
+
 
 class StupidSandbox(SandboxBase):
     """A stupid sandbox implementation. It has very few features and
@@ -421,20 +567,19 @@ class StupidSandbox(SandboxBase):
 
     """
 
-    def __init__(self, file_cacher=None, temp_dir=None):
+    def __init__(self, file_cacher, name=None, temp_dir=None):
         """Initialization.
 
         For arguments documentation, see SandboxBase.__init__.
 
         """
-        SandboxBase.__init__(self, file_cacher)
+        SandboxBase.__init__(self, file_cacher, name, temp_dir)
 
         # Make box directory
-        if temp_dir is None:
-            temp_dir = config.temp_dir
-        self.path = tempfile.mkdtemp(dir=temp_dir)
+        self.path = tempfile.mkdtemp(
+            dir=self.temp_dir,
+            prefix="cms-%s-" % (self.name))
 
-        self.cmd_file = "commands.log"
         self.exec_num = -1
         self.popen = None
         self.popen_time = None
@@ -453,21 +598,13 @@ class StupidSandbox(SandboxBase):
         self.wallclock_timeout = None
         self.extra_timeout = None
 
-        # These parameters are not going to be used, but are here for
-        # API compatibility
-        self.box_id = 0
-        self.cgroup = False
-        self.dirs = []
-        self.preserve_env = False
-        self.inherit_env = []
-        self.set_env = {}
-        self.max_processes = 1
-        self.verbosity = 0
+    def get_root_path(self):
+        """Return the toplevel path of the sandbox.
 
-        # Set common environment variables.
-        # Specifically needed by Python, that searches the home for
-        # packages.
-        self.set_env["HOME"] = "./"
+        return (string): the root path.
+
+        """
+        return self.path
 
     # TODO - It returns wall clock time, because I have no way to
     # check CPU time (libev doesn't have wait4() support)
@@ -553,7 +690,7 @@ class StupidSandbox(SandboxBase):
             return "Execution successfully finished (with exit code %d)" % \
                 self.get_exit_code()
         elif status == self.EXIT_SIGNAL:
-            return "Execution killed with signal %d" % \
+            return "Execution killed with signal %s" % \
                 self.get_killing_signal()
 
     def _popen(self, command,
@@ -577,7 +714,7 @@ class StupidSandbox(SandboxBase):
         """
         self.exec_time = None
         self.exec_num += 1
-        self.log = None
+
         logger.debug("Executing program in sandbox with command: `%s'.",
                      " ".join(command))
         with io.open(self.relative_path(self.cmd_file), 'at') as commands:
@@ -639,7 +776,7 @@ class StupidSandbox(SandboxBase):
                                    (rlimit_stack, rlimit_stack))
 
             # TODO - Doesn't work as expected
-            #resource.setrlimit(resource.RLIMIT_NPROC, (1, 1))
+            # resource.setrlimit(resource.RLIMIT_NPROC, (1, 1))
 
         # Setup std*** redirection
         if self.stdin_file:
@@ -709,12 +846,21 @@ class StupidSandbox(SandboxBase):
         else:
             return self.popen
 
-    def translate_box_exitcode(self, exitcode):
-        """The stupid box always terminates successfully (or it raises
-        an exception).
+    def translate_box_exitcode(self, _):
+        """Translate the sandbox exit code to a boolean sandbox success.
+
+        This sandbox never fails.
 
         """
         return True
+
+    def cleanup(self):
+        """Cleanup the sandbox.
+
+        This sandbox needs no cleanup.
+
+        """
+        pass
 
     def delete(self):
         """Delete the directory where the sandbox operated.
@@ -744,24 +890,29 @@ class IsolateSandbox(SandboxBase):
     """
     next_id = 0
 
-    def __init__(self, file_cacher=None, temp_dir=None):
+    # If the command line starts with this command name, we are just
+    # going to execute it without sandboxing, and with all permissions
+    # on the current directory.
+    SECURE_COMMANDS = ["/bin/cp", "/bin/mv", "/usr/bin/zip", "/usr/bin/unzip"]
+
+    def __init__(self, file_cacher, name=None, temp_dir=None):
         """Initialization.
 
         For arguments documentation, see SandboxBase.__init__.
 
         """
-        SandboxBase.__init__(self, file_cacher)
+        SandboxBase.__init__(self, file_cacher, name, temp_dir)
 
-        # Isolate only accepts ids between 0 and 99. We assign the
-        # range [(shard+1)*10, (shard+2)*10) to each Worker and keep
-        # the range [0, 10) for other uses (command-line scripts like
-        # cmsMake or direct console users of isolate). Inside each
-        # range ids are assigned sequentially, with a wrap-around.
+        # Isolate only accepts ids between 0 and 999 (by default). We assign
+        # the range [(shard+1)*10, (shard+2)*10) to each Worker and keep the
+        # range [0, 10) for other uses (command-line scripts like cmsMake or
+        # direct console users of isolate). Inside each range ids are assigned
+        # sequentially, with a wrap-around.
         # FIXME This is the only use of FileCacher.service, and it's an
         # improper use! Avoid it!
         if file_cacher is not None and file_cacher.service is not None:
             box_id = ((file_cacher.service.shard + 1) * 10
-                      + (IsolateSandbox.next_id % 10)) % 100
+                      + (IsolateSandbox.next_id % 10)) % 1000
         else:
             box_id = IsolateSandbox.next_id % 10
         IsolateSandbox.next_id += 1
@@ -773,19 +924,18 @@ class IsolateSandbox(SandboxBase):
         # system to, which is why the outer directory exists with no read
         # permissions.
         self.inner_temp_dir = "/tmp"
-        if temp_dir is None:
-            temp_dir = config.temp_dir
-        self.outer_temp_dir = tempfile.mkdtemp(dir=temp_dir)
+        self.outer_temp_dir = tempfile.mkdtemp(
+            dir=self.temp_dir,
+            prefix="cms-%s-" % (self.name))
         # Don't use os.path.join here, because the absoluteness of /tmp will
         # bite you.
         self.path = self.outer_temp_dir + self.inner_temp_dir
         os.mkdir(self.path)
-        os.chmod(self.path, 0777)
+        self.allow_writing_all()
 
         self.exec_name = 'isolate'
         self.box_exec = self.detect_box_executable()
         self.info_basename = "run.log"   # Used for -M
-        self.cmd_file = "commands.log"
         self.log = None
         self.exec_num = -1
         logger.debug("Sandbox in `%s' created, using box `%s'.",
@@ -800,11 +950,11 @@ class IsolateSandbox(SandboxBase):
         self.preserve_env = False      # -e
         self.inherit_env = []          # -E
         self.set_env = {}              # -E
+        self.fsize = None              # -f
         self.stdin_file = None         # -i
         self.stack_space = None        # -k
         self.address_space = None      # -m
         self.stdout_file = None        # -o
-        self.max_processes = 1         # -p
         self.stderr_file = None        # -r
         self.timeout = None            # -t
         self.verbosity = 0             # -v
@@ -816,14 +966,65 @@ class IsolateSandbox(SandboxBase):
         # packages.
         self.set_env["HOME"] = "./"
 
-        # Tell isolate to get the sandbox ready.
-        box_cmd = [self.box_exec] + (["--cg"] if self.cgroup else []) \
-            + ["--box-id=%d" % self.box_id] + ["--init"]
-        ret = subprocess.call(box_cmd)
-        if ret != 0:
-            raise SandboxInterfaceException(
-                "Failed to initialize sandbox with command: %s "
-                "(error %d)" % (pretty_print_cmdline(box_cmd), ret))
+        # Needed on Ubuntu by PHP (and more, ) that
+        # have in /usr/bin only a symlink to one out of many
+        # alternatives.
+        if os.path.isdir("/etc/alternatives"):
+            self.add_mapped_directories(["/etc/alternatives"])
+
+        # Needed for running PyPy
+        self.add_mapped_directories(["/opt"])
+
+        # Tell isolate to get the sandbox ready. We do our best to
+        # cleanup after ourselves, but we might have missed something
+        # if the worker was interrupted in the middle of an execution.
+        self.cleanup()
+        self.initialize_isolate()
+
+    def add_mapped_directories(self, dirs):
+        """Add dirs to the external dirs visible to the sandboxed command.
+
+        dirs ([string]): list of dirs to make visible.
+
+        """
+        for directory in dirs:
+            self.dirs.append((directory, None, "rw"))
+
+    def allow_writing_all(self):
+        """Set permissions in such a way that any operation is allowed.
+
+        """
+        os.chmod(self.path, 0o777)
+        for filename in os.listdir(self.path):
+            os.chmod(os.path.join(self.path, filename), 0o777)
+
+    def allow_writing_none(self):
+        """Set permissions in such a way that the user cannot write anything.
+
+        """
+        os.chmod(self.path, 0o755)
+        for filename in os.listdir(self.path):
+            os.chmod(os.path.join(self.path, filename), 0o755)
+
+    def allow_writing_only(self, paths):
+        """Set permissions in so that the user can write only some paths.
+
+        paths ([string]): the only paths that the user is allowed to
+            write.
+
+        """
+        # If one of the specified file do not exists, we touch it to
+        # assign the correct permissions.
+        for path in (os.path.join(self.path, path) for path in paths):
+            if not os.path.exists(path):
+                io.open(path, "wb").close()
+
+        # Close everything, then open only the specified.
+        self.allow_writing_none()
+        for path in (os.path.join(self.path, path) for path in paths):
+            # HACK to prevent messing with FIFO permissions in Communication tasks
+            if "/fifo_out_" not in path:
+                os.chmod(path, 0o722)
 
     def get_root_path(self):
         """Return the toplevel path of the sandbox.
@@ -850,11 +1051,13 @@ class IsolateSandbox(SandboxBase):
                       '..', '..', 'isolate', self.exec_name))]
         paths += [self.exec_name]
         for path in paths:
-            # Consider only non-directory, executable files.
+            # Consider only non-directory, executable files with SUID flag on.
             if os.path.exists(path) \
                     and not os.path.isdir(path) \
                     and os.access(path, os.X_OK):
-                return path
+                st = os.stat(path)
+                if st.st_mode & stat.S_ISUID != 0:
+                    return path
 
         # As default, return self.exec_name alone, that means that
         # system path is used.
@@ -871,7 +1074,7 @@ class IsolateSandbox(SandboxBase):
         if self.box_id is not None:
             res += ["--box-id=%d" % self.box_id]
         if self.cgroup:
-            res += ["--cg"]
+            res += ["--cg", "--cg-timing"]
         if self.chdir is not None:
             res += ["--chdir=%s" % self.chdir]
         for in_name, out_name, options in self.dirs:
@@ -885,14 +1088,19 @@ class IsolateSandbox(SandboxBase):
             res += ["--full-env"]
         for var in self.inherit_env:
             res += ["--env=%s" % var]
-        for var, value in self.set_env.items():
+        for var, value in iteritems(self.set_env):
             res += ["--env=%s=%s" % (var, value)]
+        if self.fsize is not None:
+            res += ["--fsize=%d" % self.fsize]
         if self.stdin_file is not None:
             res += ["--stdin=%s" % self.inner_absolute_path(self.stdin_file)]
         if self.stack_space is not None:
             res += ["--stack=%d" % self.stack_space]
         if self.address_space is not None:
-            res += ["--mem=%d" % self.address_space]
+            if self.cgroup:
+                res += ["--cg-mem=%d" % self.address_space]
+            else:
+                res += ["--mem=%d" % self.address_space]
         if self.stdout_file is not None:
             res += ["--stdout=%s" % self.inner_absolute_path(self.stdout_file)]
         if self.max_processes is not None:
@@ -927,7 +1135,7 @@ class IsolateSandbox(SandboxBase):
         try:
             with self.get_file(info_file) as log_file:
                 for line in log_file:
-                    key, value = line.strip().split(":", 1)
+                    key, value = line.decode('utf-8').strip().split(":", 1)
                     if key in self.log:
                         self.log[key].append(value)
                     else:
@@ -996,42 +1204,6 @@ class IsolateSandbox(SandboxBase):
             return int(self.log['exitcode'][0])
         return 0
 
-    # TODO - Rather fragile interface...
-    KILLING_SYSCALL_RE = re.compile("^Forbidden syscall (.*)$")
-
-    @with_log
-    def get_killing_syscall(self):
-        """Return the syscall that triggered the killing of the
-        sandboxed process, reading the log if necessary.
-
-        return (string): offending syscall, or None.
-
-        """
-        if 'message' in self.log:
-            match = self.KILLING_SYSCALL_RE.match(
-                self.log['message'][0])
-            if match is not None:
-                return match.group(1)
-        return None
-
-    # TODO - Rather fragile interface...
-    KILLING_FILE_ACCESS_RE = re.compile("^Forbidden access to file (.*)$")
-
-    @with_log
-    def get_forbidden_file_error(self):
-        """Return the error that got us killed for forbidden file
-        access.
-
-        return (string): offending error, or None.
-
-        """
-        if 'message' in self.log:
-            match = self.KILLING_FILE_ACCESS_RE.match(
-                self.log['message'][0])
-            if match is not None:
-                return match.group(1)
-        return None
-
     @with_log
     def get_status_list(self):
         """Reads the sandbox log file, and set and return the status
@@ -1054,19 +1226,16 @@ class IsolateSandbox(SandboxBase):
         status_list = self.get_status_list()
         if 'XX' in status_list:
             return self.EXIT_SANDBOX_ERROR
-        # New version seems not to report OK
-        #elif 'OK' in status_list:
-        #    return self.EXIT_OK
-        elif 'FO' in status_list:
-            return self.EXIT_SYSCALL
-        elif 'FA' in status_list:
-            return self.EXIT_FILE_ACCESS
         elif 'TO' in status_list:
-            return self.EXIT_TIMEOUT
+            if 'message' in self.log and 'wall' in self.log['message'][0]:
+                return self.EXIT_TIMEOUT_WALL
+            else:
+                return self.EXIT_TIMEOUT
         elif 'SG' in status_list:
             return self.EXIT_SIGNAL
         elif 'RE' in status_list:
             return self.EXIT_NONZERO_RETURN
+        # OK status is not reported in the log file, it's implicit.
         return self.EXIT_OK
 
     def get_human_exit_description(self):
@@ -1083,16 +1252,12 @@ class IsolateSandbox(SandboxBase):
                 self.get_exit_code()
         elif status == self.EXIT_SANDBOX_ERROR:
             return "Execution failed because of sandbox error"
-        elif status == self.EXIT_SYSCALL:
-            return "Execution killed because of forbidden syscall %s" % \
-                self.get_killing_syscall()
-        elif status == self.EXIT_FILE_ACCESS:
-            return "Execution killed because of forbidden file access: %s" \
-                % self.get_forbidden_file_error()
         elif status == self.EXIT_TIMEOUT:
             return "Execution timed out"
+        elif status == self.EXIT_TIMEOUT_WALL:
+            return "Execution timed out (wall clock limit exceeded)"
         elif status == self.EXIT_SIGNAL:
-            return "Execution killed with signal %d" % \
+            return "Execution killed with signal %s" % \
                 self.get_killing_signal()
         elif status == self.EXIT_NONZERO_RETURN:
             return "Execution failed because the return code was nonzero"
@@ -1107,29 +1272,6 @@ class IsolateSandbox(SandboxBase):
 
         """
         return os.path.join(self.inner_temp_dir, path)
-
-    # XXX - Temporarily disabled (i.e., set as private), in order to
-    # ease interface while implementing other sandboxes, since it's
-    # not used; anyway, it should probably factored through _popen in
-    # order to avoid code duplication
-    def _execute(self, command):
-        """Execute the given command in the sandbox.
-
-        command (list): executable filename and arguments of the
-                        command.
-
-        return (bool): True if the sandbox didn't report errors
-                       (caused by the sandbox itself), False otherwise
-
-        """
-        self.exec_num += 1
-        self.log = None
-        args = [self.box_exec] + self.build_box_options() + ["--"] + command
-        logger.debug("Executing program in sandbox with command: `%s'.",
-                     pretty_print_cmdline(args))
-        with io.open(self.relative_path(self.cmd_file), 'at') as commands:
-            commands.write("%s\n" % (pretty_print_cmdline(args)))
-        return self.translate_box_exitcode(subprocess.call(args))
 
     def _popen(self, command,
                stdin=None, stdout=None, stderr=None,
@@ -1148,13 +1290,49 @@ class IsolateSandbox(SandboxBase):
         return (Popen): popen object.
 
         """
-        self.exec_num += 1
         self.log = None
+        self.exec_num += 1
+
+        # We run a selection of commands without isolate, as they need
+        # to create new files. This is safe because these commands do
+        # not depend on the user input.
+        if command[0] in IsolateSandbox.SECURE_COMMANDS:
+            logger.debug("Executing non-securely: %s at %s",
+                         pretty_print_cmdline(command), self.path)
+            try:
+                prev_permissions = stat.S_IMODE(os.stat(self.path).st_mode)
+                os.chmod(self.path, 0o700)
+                with io.open(self.relative_path(self.cmd_file), 'at') as cmds:
+                    cmds.write("%s\n" % (pretty_print_cmdline(command)))
+                p = subprocess.Popen(command, cwd=self.path,
+                                     stdin=stdin, stdout=stdout, stderr=stderr,
+                                     close_fds=close_fds)
+                os.chmod(self.path, prev_permissions)
+                # For secure commands, we clear the output so that it
+                # is not forwarded to the contestants. Secure commands
+                # are "setup" commands, which should not fail or
+                # provide information for the contestants.
+                io.open(
+                    os.path.join(self.path, self.stdout_file), "wb").close()
+                io.open(
+                    os.path.join(self.path, self.stderr_file), "wb").close()
+                self._write_empty_run_log(self.exec_num)
+            except OSError:
+                logger.critical(
+                    "Failed to execute program in sandbox with command: %s",
+                    pretty_print_cmdline(command), exc_info=True)
+                raise
+            return p
+
         args = [self.box_exec] + self.build_box_options() + ["--"] + command
         logger.debug("Executing program in sandbox with command: `%s'.",
                      pretty_print_cmdline(args))
+        # Temporarily allow writing new files.
+        prev_permissions = stat.S_IMODE(os.stat(self.path).st_mode)
+        os.chmod(self.path, 0o770)
         with io.open(self.relative_path(self.cmd_file), 'at') as commands:
             commands.write("%s\n" % (pretty_print_cmdline(args)))
+        os.chmod(self.path, prev_permissions)
         try:
             p = subprocess.Popen(args,
                                  stdin=stdin, stdout=stdout, stderr=stderr,
@@ -1166,6 +1344,15 @@ class IsolateSandbox(SandboxBase):
             raise
 
         return p
+
+    def _write_empty_run_log(self, index):
+        """Write a fake run.log file with no information."""
+        with io.open(os.path.join(self.path, "run.log.%s" % index),
+                     "wt", encoding="utf-8") as f:
+            f.write("time:0.000\n")
+            f.write("time-wall:0.000\n")
+            f.write("max-rss:0\n")
+            f.write("cg-mem:0\n")
 
     def execute_without_std(self, command, wait=False):
         """Execute the given command in the sandbox using
@@ -1198,15 +1385,16 @@ class IsolateSandbox(SandboxBase):
             return popen
 
     def translate_box_exitcode(self, exitcode):
-        """Translate the sandbox exit code according to the
-        following table:
-         * 0 -> everything ok -> returns True
-         * 1 -> error in the program inside the sandbox ->
-                returns True
-         * 2 -> error in the sandbox itself -> returns False
+        """Translate the sandbox exit code to a boolean sandbox success.
 
-        Basically, it recognizes whether the sandbox executed
-        correctly or not.
+        Isolate emits the following exit codes:
+        * 0 -> both sandbox and internal process finished successfully (meta
+            file will contain "status:OK" -> return True;
+        * 1 -> sandbox finished successfully, but internal process was
+            terminated, e.g., due to timeout (meta file will contain
+            status:x" with x in (TO, SG, RE)) -> return True;
+        * 2 -> sandbox terminated with an error (meta file will contain
+            "status:XX") -> return False.
 
         """
         if exitcode == 0 or exitcode == 1:
@@ -1214,18 +1402,43 @@ class IsolateSandbox(SandboxBase):
         elif exitcode == 2:
             return False
         else:
-            raise SandboxInterfaceException("Sandbox exit status unknown")
+            raise SandboxInterfaceException("Sandbox exit status (%d) unknown"
+                                            % exitcode)
+
+    def initialize_isolate(self):
+        """Initialize isolate's box."""
+        init_cmd = (
+            [self.box_exec]
+            + (["--cg"] if self.cgroup else [])
+            + ["--box-id=%d" % self.box_id, "--init"])
+        ret = subprocess.call(init_cmd)
+        if ret != 0:
+            raise SandboxInterfaceException(
+                "Failed to initialize sandbox with command: %s "
+                "(error %d)" % (pretty_print_cmdline(init_cmd), ret))
+
+    def cleanup(self):
+        """Cleanup the sandbox.
+
+        To be called at the end of the execution, regardless of
+        whether the sandbox should be deleted or not.
+
+        """
+        # Tell isolate to cleanup the sandbox.
+        subprocess.call(
+            [self.box_exec]
+            + (["--cg"] if self.cgroup else [])
+            + ["--box-id=%d" % self.box_id]
+            + ["--cleanup"],
+            # Use subprocess.DEVNULL when dropping Python 2.
+            stdout=io.open(os.devnull, "r+b"),
+            stderr=subprocess.STDOUT)
 
     def delete(self):
         """Delete the directory where the sandbox operated.
 
         """
         logger.debug("Deleting sandbox in %s.", self.path)
-
-        # Tell isolate to cleanup the sandbox.
-        box_cmd = [self.box_exec] + (["--cg"] if self.cgroup else []) \
-            + ["--box-id=%d" % self.box_id]
-        subprocess.call(box_cmd + ["--cleanup"])
 
         # Delete the working directory.
         rmtree(self.outer_temp_dir)

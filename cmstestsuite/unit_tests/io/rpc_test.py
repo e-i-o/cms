@@ -1,8 +1,9 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
-# Copyright © 2014 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2014-2017 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2015 Stefano Maggiolo <s.maggiolo@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -22,8 +23,11 @@
 """
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
 import unittest
 
@@ -90,7 +94,7 @@ class TestRPC(unittest.TestCase):
         port (int): the port (0 causes any available port to be chosen)
 
         """
-        self._server = StreamServer((host, port), self.get_server)
+        self._server = StreamServer((host, port), self.handle_new_connection)
         self._server.start()
         self.host = self._server.server_host
         self.port = self._server.server_port
@@ -98,27 +102,29 @@ class TestRPC(unittest.TestCase):
 
     def kill_listener(self):
         """Stop listening."""
-        self._server.stop()
-        del self._server
+        # Some code may kill the listener in the middle of a test, and
+        # plan to spawn a new one aftwerards. Yet if the test fails
+        # then upon tearDown _server will still be unset.
+        if hasattr(self, "_server"):
+            self._server.stop()
+            del self._server
         # We leave self.host and self.port.
 
-    def get_server(self, socket_, address):
-        """Obtain a new RemoteServiceServer to handle a new connection.
+    def handle_new_connection(self, socket_, address):
+        """Create a new RemoteServiceServer to handle a new connection.
 
-        Instantiate a RemoteServiceServer, spawn its greenlet and add
-        it to self.servers. It will listen on the given socket, that
-        represents a connection opened by a remote host at the given
-        address.
+        Instantiate a RemoteServiceServer, add it to self.servers and
+        have it listen on the given socket (which is for a connection
+        opened by a remote host from the given address). This method
+        will block until the socket gets closed.
 
         socket_ (socket): the socket to use
         address (tuple): the (ip address, port) of the remote part
-        return (RemoteServiceServer): a server
 
         """
         server = RemoteServiceServer(self.service, address)
-        server.handle(socket_)
         self.servers.append(server)
-        return server
+        server.handle(socket_)
 
     def get_client(self, coord, auto_retry=None):
         """Obtain a new RemoteServiceClient to connect to a server.
@@ -140,21 +146,27 @@ class TestRPC(unittest.TestCase):
 
     def disconnect_servers(self):
         """Disconnect all registered servers from their clients."""
-        for server in self.servers:
+        servers = self.servers.copy()
+        for server in servers:
             if server.connected:
                 server.disconnect()
 
     def disconnect_clients(self):
         """Disconnect all registered clients from their servers."""
-        for client in self.clients:
+        clients = self.clients.copy()
+        for client in clients:
             if client.connected:
                 client.disconnect()
+
+    def sleep(self):
+        """Pause the greenlet so other work can be done."""
+        gevent.sleep(0.005)
 
     def tearDown(self):
         self.kill_listener()
         self.disconnect_clients()
         self.disconnect_servers()
-        gevent.sleep(0.002)
+        self.sleep()
 
     def test_method_not_existent(self):
         client = self.get_client(ServiceCoord("Foo", 0))
@@ -224,41 +236,41 @@ class TestRPC(unittest.TestCase):
 
     def test_autoreconnect1(self):
         client = self.get_client(ServiceCoord("Foo", 0), 0.002)
-        gevent.sleep(0.002)
+        self.sleep()
         self.assertTrue(client.connected)
         self.disconnect_servers()
-        gevent.sleep(0.002)
+        gevent.sleep(0.01)
         self.assertTrue(client.connected, "Autoreconnect didn't kick in "
                                           "after server disconnected")
 
     def test_autoreconnect2(self):
         client = self.get_client(ServiceCoord("Foo", 0), 0.002)
-        gevent.sleep(0.002)
+        self.sleep()
         self.assertTrue(client.connected)
         self.disconnect_servers()
         self.kill_listener()
-        gevent.sleep(0.002)
+        self.sleep()
         self.assertFalse(client.connected)
         self.spawn_listener(port=self.port)
-        gevent.sleep(0.002)
+        self.sleep()
         self.assertTrue(client.connected, "Autoreconnect didn't kick in "
                                           "after server came back online")
 
     def test_autoreconnect3(self):
         client = self.get_client(ServiceCoord("Foo", 0), 0.002)
-        gevent.sleep(0.002)
+        self.sleep()
         self.assertTrue(client.connected)
         self.disconnect_clients()
-        gevent.sleep(0.002)
+        self.sleep()
         self.assertFalse(client.connected, "Autoreconnect still active "
                                            "after explicit disconnection")
 
     def test_concurrency(self):
         client = self.get_client(ServiceCoord("Foo", 0))
         result1 = client.infinite()
-        gevent.sleep(0.002)
+        self.sleep()
         result2 = client.echo(value=True)
-        gevent.sleep(0.002)
+        self.sleep()
         self.assertTrue(result2.successful())
         self.assertIs(result2.value, True)
         self.assertFalse(result1.ready())
@@ -270,7 +282,7 @@ class TestRPC(unittest.TestCase):
     def test_callbacks(self):
         coord = ServiceCoord("Foo", 0)
         client = self.get_client(coord)
-        gevent.sleep(0.002)
+        self.sleep()
         client.disconnect()
         on_connect_handler = Mock()
         client.add_on_connect_handler(on_connect_handler)
@@ -278,21 +290,21 @@ class TestRPC(unittest.TestCase):
         client.add_on_disconnect_handler(on_disconnect_handler)
 
         client.connect()
-        gevent.sleep(0.002)
+        self.sleep()
         self.assertTrue(client.connected)
         on_connect_handler.assert_called_once_with(coord)
         on_connect_handler.reset_mock()
         self.assertFalse(on_disconnect_handler.called)
 
         client.disconnect()
-        gevent.sleep(0.002)
+        self.sleep()
         self.assertFalse(client.connected)
         self.assertFalse(on_connect_handler.called)
         on_disconnect_handler.assert_called_once_with()
         on_disconnect_handler.reset_mock()
 
         client.connect()
-        gevent.sleep(0.002)
+        self.sleep()
         self.assertTrue(client.connected)
         on_connect_handler.assert_called_once_with(coord)
         on_connect_handler.reset_mock()
@@ -321,14 +333,14 @@ class TestRPC(unittest.TestCase):
             self.assertEqual(result.value, 42)
             self.assertTrue(client.connected)
 
-            gevent.sleep(0.002)
+            self.sleep()
             client.disconnect()
             self.assertFalse(client.connected)
-            gevent.sleep(0.002)
+            self.sleep()
             client.connect()
             self.assertTrue(client.connected)
 
-        gevent.sleep(0.002)
+        self.sleep()
 
         self.assertEqual(on_connect_handler.call_count, 10)
         self.assertEqual(on_disconnect_handler.call_count, 10)
@@ -342,8 +354,8 @@ class TestRPC(unittest.TestCase):
     def test_double_connect_server(self):
         # Check that asking an already-connected server to initialize
         # again its connection causes an error.
-        client = self.get_client(ServiceCoord("Foo", 0))
-        gevent.sleep(0.002)
+        self.get_client(ServiceCoord("Foo", 0))
+        self.sleep()
         self.assertRaises(Exception, self.servers[0].initialize, "foo")
 
     def test_double_disconnect_client(self):
@@ -351,32 +363,32 @@ class TestRPC(unittest.TestCase):
         # harmless (i.e. disconnection is idempotent).
         client = self.get_client(ServiceCoord("Foo", 0))
         client.disconnect()
-        gevent.sleep(0.002)
+        self.sleep()
         client.disconnect()
-        gevent.sleep(0.002)
+        self.sleep()
 
     def test_double_disconnect_server(self):
         # Check that asking a non-connected server to disconnect is
         # harmless (i.e. disconnection is idempotent).
-        client = self.get_client(ServiceCoord("Foo", 0))
-        gevent.sleep(0.002)
+        self.get_client(ServiceCoord("Foo", 0))
+        self.sleep()
         self.servers[0].disconnect()
-        gevent.sleep(0.002)
+        self.sleep()
         self.servers[0].disconnect()
-        gevent.sleep(0.002)
+        self.sleep()
 
     def test_send_invalid_json(self):
         sock = gevent.socket.create_connection((self.host, self.port))
-        sock.sendall("foo\r\n")
-        gevent.sleep(0.002)
+        sock.sendall(b"foo\r\n")
+        self.sleep()
         self.assertTrue(self.servers[0].connected)
         # Verify the server resumes normal operation.
         self.test_method_return_int()
 
     def test_send_incomplete_json(self):
         sock = gevent.socket.create_connection((self.host, self.port))
-        sock.sendall('{"__id": "foo"}\r\n')
-        gevent.sleep(0.002)
+        sock.sendall(b'{"__id": "foo"}\r\n')
+        self.sleep()
         self.assertTrue(self.servers[0].connected)
         # Verify the server resumes normal operation.
         self.test_method_return_int()

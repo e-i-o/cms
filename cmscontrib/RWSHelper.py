@@ -1,8 +1,9 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2013 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2016 Stefano Maggiolo <s.maggiolo@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -26,27 +27,22 @@ entity that has been deleted in the DB without any downtime.
 """
 
 from __future__ import absolute_import
-from __future__ import unicode_literals
+from __future__ import division
 from __future__ import print_function
+from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
 # We enable monkey patching to make many libraries gevent-friendly
 # (for instance, urllib3, used by requests)
 import gevent.monkey
-gevent.monkey.patch_all()
+gevent.monkey.patch_all()  # noqa
 
 import argparse
 import logging
 import sys
 
-import six
-
-if six.PY3:
-    from urllib.parse import quote, urljoin, urlsplit
-else:
-    from urllib import quote
-    from urlparse import urljoin, urlsplit
-
-from six.moves import xrange
+from future.moves.urllib.parse import quote, urljoin, urlsplit
 
 from requests import Session, Request
 from requests.exceptions import RequestException
@@ -86,7 +82,7 @@ def main():
     # and nargs='+' but it doesn't seem to work with subparsers...
     parser.add_argument(
         '-r', '--ranking', dest='rankings', action='append', type=int,
-        choices=list(xrange(len(config.rankings))), metavar='shard',
+        choices=list(range(len(config.rankings))), metavar='shard',
         help="select which RWS to connect to (omit for 'all')")
     subparsers = parser.add_subparsers(
         title='available actions', metavar='action',
@@ -131,13 +127,13 @@ def main():
 
     if args.verbose:
         verb = args.action[:4] + 'ting'
-        logger.info("%s entity '%ss/%s'" % (verb.capitalize(),
-                                            args.entity_type, args.entity_id))
+        logger.info("%s entity '%ss/%s'", verb.capitalize(),
+                    args.entity_type, args.entity_id)
 
     if args.rankings is not None:
         shards = args.rankings
     else:
-        shards = list(xrange(len(config.rankings)))
+        shards = list(range(len(config.rankings)))
 
     s = Session()
     had_error = False
@@ -149,9 +145,8 @@ def main():
         auth = urlsplit(url)
 
         if args.verbose:
-            logger.info(
-                "Preparing %s request to %s" %
-                (ACTION_METHODS[args.action], url))
+            logger.info("Preparing %s request to %s",
+                        ACTION_METHODS[args.action], url)
 
         if hasattr(args, 'file'):
             if args.verbose:
@@ -169,9 +164,8 @@ def main():
 
         try:
             res = s.send(req, verify=config.https_certfile)
-        except RequestException as error:
-            logger.error("Failed")
-            logger.info(repr(error))
+        except RequestException:
+            logger.error("Failed", exc_info=True)
             had_error = True
             continue
 
@@ -179,7 +173,7 @@ def main():
             logger.info("Response received")
 
         if 400 <= res.status_code < 600:
-            logger.error("Unexpected status code: %d" % res.status_code)
+            logger.error("Unexpected status code: %d", res.status_code)
             had_error = True
             continue
 
@@ -187,8 +181,10 @@ def main():
             print(res.content)
 
     if had_error:
-        sys.exit(1)
+        return 1
+    else:
+        return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

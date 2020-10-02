@@ -1,9 +1,9 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2010-2014 Giovanni Mascellani <mascellani@poisson.phc.unipi.it>
-# Copyright © 2010-2014 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2010-2016 Stefano Maggiolo <s.maggiolo@gmail.com>
 # Copyright © 2010-2012 Matteo Boscariol <boscarim@hotmail.com>
 # Copyright © 2013 Luca Wehrstedt <luca.wehrstedt@gmail.com>
 #
@@ -26,8 +26,12 @@ using gevent and JSON encoding.
 """
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
+from six import itervalues
 
 import errno
 import functools
@@ -36,7 +40,6 @@ import os
 import pwd
 import signal
 import socket
-import _socket
 import time
 
 import gevent
@@ -48,7 +51,7 @@ from gevent.backdoor import BackdoorServer
 from cms import ConfigError, config, mkdir, ServiceCoord, Address, \
     get_service_address
 from cms.log import root_logger, shell_handler, ServiceFilter, \
-    CustomFormatter, LogServiceHandler, FileHandler
+    DetailedFormatter, LogServiceHandler, FileHandler
 from cmscommon.datetime import monotonic_time
 
 from .rpc import rpc_method, RemoteServiceServer, RemoteServiceClient, \
@@ -126,7 +129,8 @@ class Service(object):
                                "%s-%d" % (self.name, self.shard))
         mkdir(config.log_dir)
         mkdir(log_dir)
-        log_filename = "%d.log" % int(time.time())
+
+        log_filename = time.strftime("%Y-%m-%d-%H-%M-%S.log")
 
         # Install a file handler.
         file_handler = FileHandler(os.path.join(log_dir, log_filename),
@@ -136,7 +140,7 @@ class Service(object):
         else:
             file_log_level = logging.INFO
         file_handler.setLevel(file_log_level)
-        file_handler.setFormatter(CustomFormatter(False))
+        file_handler.setFormatter(DetailedFormatter(False))
         file_handler.addFilter(filter_)
         root_logger.addHandler(file_handler)
 
@@ -214,6 +218,9 @@ class Service(object):
         if on_connect is not None:
             service.add_on_connect_handler(on_connect)
 
+        if on_disconnect is not None:
+            service.add_on_disconnect_handler(on_disconnect)
+
         return service
 
     def add_timeout(self, func, plus, seconds, immediately=False):
@@ -262,10 +269,11 @@ class Service(object):
         else:
             logger.warning("A backdoor socket has been found and deleted.")
         mkdir(os.path.dirname(backdoor_path))
-        backdoor_sock = _socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        backdoor_sock = gevent.socket.socket(socket.AF_UNIX,
+                                             socket.SOCK_STREAM)
         backdoor_sock.setblocking(0)
         backdoor_sock.bind(backdoor_path)
-        user = pwd.getpwnam("cmsuser")
+        user = pwd.getpwnam(config.cmsuser)
         # We would like to also set the user to "cmsuser" but only root
         # can do that. Therefore we limit ourselves to the group.
         os.chown(backdoor_path, os.getuid(), user.pw_gid)
@@ -339,7 +347,7 @@ class Service(object):
         """Disconnect all remote services.
 
         """
-        for service in self.remote_services.itervalues():
+        for service in itervalues(self.remote_services):
             if service.connected:
                 service.disconnect()
 

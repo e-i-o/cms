@@ -1,11 +1,12 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2010-2012 Giovanni Mascellani <mascellani@poisson.phc.unipi.it>
-# Copyright © 2010-2013 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2010-2018 Stefano Maggiolo <s.maggiolo@gmail.com>
 # Copyright © 2010-2012 Matteo Boscariol <boscarim@hotmail.com>
 # Copyright © 2012 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2017 Valentin Rosca <rosca.valentin2012@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -23,51 +24,45 @@
 """Utilities dealing with encryption and randomness."""
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
-import base64
+import bcrypt
 import binascii
+import random
 
+from string import ascii_lowercase
+
+from Crypto import Random
 from Crypto.Cipher import AES
+
+from cmscommon.binary import bin_to_hex, hex_to_bin, bin_to_b64, b64_to_bin
 
 
 __all__ = [
-    "is_random_secure",
-
     "get_random_key", "get_hex_random_key",
 
-    "encrypt_string", "decrypt_string",
+    "encrypt_binary", "decrypt_binary",
     "encrypt_number", "decrypt_number",
+
+    "generate_random_password",
+
+    "validate_password", "build_password", "hash_password",
+    "parse_authentication",
     ]
 
 
-# Some older versions of pycrypto don't provide a Random module
-# If that's the case, fallback to weak standard library PRG
-try:
-    from Crypto import Random
-    _rndfile = Random.new()
-    get_random_bits = lambda x: _rndfile.read(x)
-    is_random_secure = True
-except ImportError:
-    import random
-    get_random_bits = lambda x: binascii.unhexlify("%032x" %
-                                                   random.getrandbits(x * 8))
-    is_random_secure = False
-
-
-def _get_secret_key_unhex():
-    # Only import this if we need it. Otherwise, we would prefer to
-    # remain independent of the rest of CMS.
-    from cms import config
-    return binascii.unhexlify(config.secret_key)
+_RANDOM = Random.new()
 
 
 def get_random_key():
     """Generate 16 random bytes, safe to be used as AES key.
 
     """
-    return get_random_bits(16)
+    return _RANDOM.read(16)
 
 
 def get_hex_random_key():
@@ -75,27 +70,28 @@ def get_hex_random_key():
     Return it encoded in hexadecimal.
 
     """
-    return binascii.hexlify(get_random_key())
+    return bin_to_hex(get_random_key())
 
 
-def encrypt_string(pt, key=None):
-    """Encrypt the plaintext (pt) with the 16-bytes key. Moreover, it
-    encrypts it using a random IV, so that encrypting repeatedly the
-    same string gives different outputs. This way no analisys can made
-    when the same number is used in different contexts. The generated
-    string uses the alphabet { 'a', ..., 'z', 'A', ..., 'Z', '0', ...,
-    '9', '.', '-', '_' }, so it is safe to use in URLs.
+def encrypt_binary(pt, key_hex):
+    """Encrypt the plaintext with the 16-bytes key.
 
-    If key is not specified, it is obtained from the configuration.
+    A random salt is added to avoid having the same input being
+    encrypted to the same output.
+
+    pt (bytes): the "plaintext" to encode.
+    key_hex (str): a 16-bytes key in hex (a string of 32 hex chars).
+
+    return (str): pt encrypted using the key, in a format URL-safe
+        (more precisely, base64-encoded with alphabet "a-zA-Z0-9.-_").
 
     """
-    if key is None:
-        key = _get_secret_key_unhex()
+    key = hex_to_bin(key_hex)
     # Pad the plaintext to make its length become a multiple of the block size
     # (that is, for AES, 16 bytes), using a byte 0x01 followed by as many bytes
     # 0x00 as needed. If the length of the message is already a multiple of 16
     # bytes, add a new block.
-    pt_pad = bytes(pt) + b'\01' + b'\00' * (16 - (len(pt) + 1) % 16)
+    pt_pad = pt + b'\01' + b'\00' * (16 - (len(pt) + 1) % 16)
     # The IV is a random block used to differentiate messages encrypted with
     # the same key. An IV should never be used more than once in the lifetime
     # of the key. In this way encrypting the same plaintext twice will produce
@@ -105,24 +101,29 @@ def encrypt_string(pt, key=None):
     aes = AES.new(key, AES.MODE_CBC, iv)
     ct = aes.encrypt(pt_pad)
     # Convert the ciphertext in a URL-safe base64 encoding
-    ct_b64 = base64.urlsafe_b64encode(iv + ct).replace(b'=', b'.')
+    ct_b64 = bin_to_b64(iv + ct)\
+        .replace('+', '-').replace('/', '_').replace('=', '.')
     return ct_b64
 
 
-def decrypt_string(ct_b64, key=None):
-    """Decrypt a ciphertext (ct_b64) encrypted with encrypt_string and
-    return the corresponding plaintext.
+def decrypt_binary(ct_b64, key_hex):
+    """Decrypt a ciphertext generated by encrypt_binary.
 
-    If key is not specified, it is obtained from the configuration.
+    ct_b64 (str): the ciphertext as produced by encrypt_binary.
+    key_hex (str): the 16-bytes key in hex format used to encrypt.
+
+    return (bytes): the plaintext.
+
+    raise (ValueError): if the ciphertext is invalid.
 
     """
-    if key is None:
-        key = _get_secret_key_unhex()
+    key = hex_to_bin(key_hex)
     try:
         # Convert the ciphertext from a URL-safe base64 encoding to a
         # bytestring, which contains both the IV (the first 16 bytes) as well
         # as the encrypted padded plaintext.
-        iv_ct = base64.urlsafe_b64decode(bytes(ct_b64).replace(b'.', b'='))
+        iv_ct = b64_to_bin(
+            ct_b64.replace('-', '+').replace('_', '/').replace('.', '='))
         aes = AES.new(key, AES.MODE_CBC, iv_ct[:16])
         # Get the padded plaintext.
         pt_pad = aes.decrypt(iv_ct[16:])
@@ -131,27 +132,113 @@ def decrypt_string(ct_b64, key=None):
         # 15 bytes 0x00 preceded by a byte 0x01.
         pt = pt_pad.rstrip(b'\x00')[:-1]
         return pt
-    except TypeError:
+    except (TypeError, binascii.Error):
         raise ValueError('Could not decode from base64.')
     except ValueError:
         raise ValueError('Wrong AES cryptogram length.')
 
 
-def encrypt_number(num, key=None):
+def encrypt_number(num, key_hex):
     """Encrypt an integer number, with the same properties as
-    encrypt_string().
-
-    If key is not specified, it is obtained from the configuration.
+    encrypt_binary().
 
     """
     hexnum = b"%x" % num
-    return encrypt_string(hexnum, key)
+    return encrypt_binary(hexnum, key_hex)
 
 
-def decrypt_number(enc, key=None):
+def decrypt_number(enc, key_hex):
     """Decrypt an integer number encrypted with encrypt_number().
 
-    If key is not specified, it is obtained from the configuration.
+    """
+    return int(decrypt_binary(enc, key_hex), 16)
+
+
+def generate_random_password():
+    """Utility method to generate a random password.
+
+    return (str): a random string.
 
     """
-    return int(decrypt_string(enc, key), 16)
+    return "".join((random.choice(ascii_lowercase) for _ in range(6)))
+
+
+def parse_authentication(authentication):
+    """Split the given method:password field into its components.
+
+    authentication (str): an authentication string as stored in the DB,
+        for example "plaintext:password".
+
+    return (str, str): the method and the payload
+
+    raise (ValueError): when the authentication string is not valid.
+
+    """
+    method, sep, payload = authentication.partition(":")
+
+    if sep != ":":
+        raise ValueError("Authentication string not parsable.")
+
+    return method, payload
+
+
+def validate_password(authentication, password):
+    """Validate the given password for the required authentication.
+
+    authentication (str): an authentication string as stored in the db,
+        for example "plaintext:password".
+    password (str): the password provided by the user.
+
+    return (bool): whether password is correct.
+
+    raise (ValueError): when the authentication string is not valid or
+        the method is not known.
+
+    """
+    method, payload = parse_authentication(authentication)
+    if method == "bcrypt":
+        password = password.encode('utf-8')
+        payload = payload.encode('utf-8')
+        try:
+            return bcrypt.hashpw(password, payload) == payload
+        except ValueError:
+            return False
+    elif method == "plaintext":
+        return payload == password
+    else:
+        raise ValueError("Authentication method not known.")
+
+
+def build_password(password, method="plaintext"):
+    """Build an auth string from an already-hashed password.
+
+    password (str): the hashed password.
+    method (str): the hasing method to use.
+
+    return (str): the string embedding the method and the password.
+
+    """
+    # TODO make sure it's a valid bcrypt hash if method is bcrypt.
+    return "%s:%s" % (method, password)
+
+
+def hash_password(password, method="bcrypt"):
+    """Hash and build an auth string from a plaintext password.
+
+    password (str): the password in plaintext.
+    method (str): the hashing method to use.
+
+    return (str): the auth string containing the hashed password.
+
+    raise (ValueError): if the method is not supported.
+
+    """
+    if method == "bcrypt":
+        password = password.encode('utf-8')
+        payload = bcrypt.hashpw(password, bcrypt.gensalt()).decode('ascii')
+    elif method == "plaintext":
+        payload = password
+    else:
+        raise ValueError("Authentication method not known.")
+
+    return build_password(payload, method)

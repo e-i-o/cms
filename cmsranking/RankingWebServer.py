@@ -1,8 +1,8 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
-# Copyright © 2011-2013 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2011-2017 Luca Wehrstedt <luca.wehrstedt@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -18,8 +18,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
+from six import iterkeys, itervalues, iteritems
 
 import argparse
 import functools
@@ -48,42 +52,51 @@ from werkzeug.utils import redirect
 import cmsranking.Logger
 
 from cmscommon.eventsource import EventSource
-from cmsranking.Config import config
+from cmsranking.Config import Config
 from cmsranking.Entity import InvalidData
-import cmsranking.Contest as Contest
-import cmsranking.Task as Task
-import cmsranking.Team as Team
-import cmsranking.User as User
-import cmsranking.Submission as Submission
-import cmsranking.Subchange as Subchange
-import cmsranking.Scoring as Scoring
+from cmsranking.Contest import Contest
+from cmsranking.Task import Task
+from cmsranking.Team import Team
+from cmsranking.User import User
+from cmsranking.Submission import Submission
+from cmsranking.Subchange import Subchange
+from cmsranking.Scoring import ScoringStore
+from cmsranking.Store import Store
 
 
 logger = logging.getLogger(__name__)
 
 
 class CustomUnauthorized(Unauthorized):
+
+    def __init__(self, realm_name):
+        self.realm_name = realm_name
+
     def get_response(self, environ=None):
         response = Unauthorized.get_response(self, environ)
         # XXX With werkzeug-0.9 a full-featured Response object is
         # returned: there is no need for this.
         response = Response.force_type(response)
-        response.www_authenticate.set_basic(config.realm_name)
+        response.www_authenticate.set_basic(self.realm_name)
         return response
 
 
 class StoreHandler(object):
-    def __init__(self, store):
-        self.store = store
 
-        self.router = Map(
-            [Rule("/<key>", methods=["GET"], endpoint="get"),
-             Rule("/", methods=["GET"], endpoint="get_list"),
-             Rule("/<key>", methods=["PUT"], endpoint="put"),
-             Rule("/", methods=["PUT"], endpoint="put_list"),
-             Rule("/<key>", methods=["DELETE"], endpoint="delete"),
-             Rule("/", methods=["DELETE"], endpoint="delete_list"),
-             ], encoding_errors="strict")
+    def __init__(self, store, username, password, realm_name):
+        self.store = store
+        self.username = username
+        self.password = password
+        self.realm_name = realm_name
+
+        self.router = Map([
+            Rule("/<key>", methods=["GET"], endpoint="get"),
+            Rule("/", methods=["GET"], endpoint="get_list"),
+            Rule("/<key>", methods=["PUT"], endpoint="put"),
+            Rule("/", methods=["PUT"], endpoint="put_list"),
+            Rule("/<key>", methods=["DELETE"], endpoint="delete"),
+            Rule("/", methods=["DELETE"], endpoint="delete_list"),
+        ], encoding_errors="strict")
 
     def __call__(self, environ, start_response):
         return self.wsgi_app(environ, start_response)
@@ -124,8 +137,8 @@ class StoreHandler(object):
     def authorized(self, request):
         return request.authorization is not None and \
             request.authorization.type == "basic" and \
-            request.authorization.username == config.username and \
-            request.authorization.password == config.password
+            request.authorization.username == self.username and \
+            request.authorization.password == self.password
 
     def get(self, request, response, key):
         # Limit charset of keys.
@@ -133,20 +146,15 @@ class StoreHandler(object):
             return NotFound()
         if key not in self.store:
             raise NotFound()
-        if request.accept_mimetypes.quality("application/json") <= 0:
-            raise NotAcceptable()
 
         response.status_code = 200
-        response.headers[b'Timestamp'] = b"%0.6f" % time.time()
+        response.headers['Timestamp'] = "%0.6f" % time.time()
         response.mimetype = "application/json"
         response.data = json.dumps(self.store.retrieve(key))
 
     def get_list(self, request, response):
-        if request.accept_mimetypes.quality("application/json") <= 0:
-            raise NotAcceptable()
-
         response.status_code = 200
-        response.headers[b'Timestamp'] = b"%0.6f" % time.time()
+        response.headers['Timestamp'] = "%0.6f" % time.time()
         response.mimetype = "application/json"
         response.data = json.dumps(self.store.retrieve_list())
 
@@ -158,7 +166,7 @@ class StoreHandler(object):
             logger.warning("Unauthorized request.",
                            extra={'location': request.url,
                                   'details': repr(request.authorization)})
-            raise CustomUnauthorized()
+            raise CustomUnauthorized(self.realm_name)
         if request.mimetype != "application/json":
             logger.warning("Unsupported MIME type.",
                            extra={'location': request.url,
@@ -190,7 +198,7 @@ class StoreHandler(object):
             logger.info("Unauthorized request.",
                         extra={'location': request.url,
                                'details': repr(request.authorization)})
-            raise CustomUnauthorized()
+            raise CustomUnauthorized(self.realm_name)
         if request.mimetype != "application/json":
             logger.warning("Unsupported MIME type.",
                            extra={'location': request.url,
@@ -224,7 +232,7 @@ class StoreHandler(object):
             logger.info("Unauthorized request.",
                         extra={'location': request.url,
                                'details': repr(request.authorization)})
-            raise CustomUnauthorized()
+            raise CustomUnauthorized(self.realm_name)
 
         self.store.delete(key)
 
@@ -235,7 +243,7 @@ class StoreHandler(object):
             logger.info("Unauthorized request.",
                         extra={'location': request.url,
                                'details': repr(request.authorization)})
-            raise CustomUnauthorized()
+            raise CustomUnauthorized(self.realm_name)
 
         self.store.delete_list()
 
@@ -244,39 +252,40 @@ class StoreHandler(object):
 
 class DataWatcher(EventSource):
     """Receive the messages from the entities store and redirect them."""
-    def __init__(self):
-        self._CACHE_SIZE = config.buffer_size
+
+    def __init__(self, stores, buffer_size):
+        self._CACHE_SIZE = buffer_size
         EventSource.__init__(self)
 
-        Contest.store.add_create_callback(
+        stores["contest"].add_create_callback(
             functools.partial(self.callback, "contest", "create"))
-        Contest.store.add_update_callback(
+        stores["contest"].add_update_callback(
             functools.partial(self.callback, "contest", "update"))
-        Contest.store.add_delete_callback(
+        stores["contest"].add_delete_callback(
             functools.partial(self.callback, "contest", "delete"))
 
-        Task.store.add_create_callback(
+        stores["task"].add_create_callback(
             functools.partial(self.callback, "task", "create"))
-        Task.store.add_update_callback(
+        stores["task"].add_update_callback(
             functools.partial(self.callback, "task", "update"))
-        Task.store.add_delete_callback(
+        stores["task"].add_delete_callback(
             functools.partial(self.callback, "task", "delete"))
 
-        Team.store.add_create_callback(
+        stores["team"].add_create_callback(
             functools.partial(self.callback, "team", "create"))
-        Team.store.add_update_callback(
+        stores["team"].add_update_callback(
             functools.partial(self.callback, "team", "update"))
-        Team.store.add_delete_callback(
+        stores["team"].add_delete_callback(
             functools.partial(self.callback, "team", "delete"))
 
-        User.store.add_create_callback(
+        stores["user"].add_create_callback(
             functools.partial(self.callback, "user", "create"))
-        User.store.add_update_callback(
+        stores["user"].add_update_callback(
             functools.partial(self.callback, "user", "update"))
-        User.store.add_delete_callback(
+        stores["user"].add_delete_callback(
             functools.partial(self.callback, "user", "delete"))
 
-        Scoring.store.add_score_callback(self.score_callback)
+        stores["scoring"].add_score_callback(self.score_callback)
 
     def callback(self, entity, event, key, *args):
         self.send(entity, "%s %s" % (event, key))
@@ -286,46 +295,102 @@ class DataWatcher(EventSource):
         self.send("score", "%s %s %0.2f" % (user, task, score))
 
 
-def SubListHandler(request, response, user_id):
-    if request.accept_mimetypes.quality("application/json") <= 0:
-        raise NotAcceptable()
+class SubListHandler(object):
 
-    result = list()
-    for task_id in Task.store._store.iterkeys():
-        result.extend(Scoring.store.get_submissions(user_id, task_id).values())
-    result.sort(key=lambda x: (x.task, x.time))
-    result = list(a.__dict__ for a in result)
+    def __init__(self, stores):
+        self.task_store = stores["task"]
+        self.scoring_store = stores["scoring"]
 
-    response.status_code = 200
-    response.mimetype = "application/json"
-    response.data = json.dumps(result)
+        self.router = Map([
+            Rule("/<user_id>", methods=["GET"], endpoint="sublist"),
+        ], encoding_errors="strict")
+
+    def __call__(self, environ, start_response):
+        return self.wsgi_app(environ, start_response)
+
+    def wsgi_app(self, environ, start_response):
+        route = self.router.bind_to_environ(environ)
+        try:
+            endpoint, args = route.match()
+        except HTTPException as exc:
+            return exc(environ, start_response)
+
+        assert endpoint == "sublist"
+
+        request = Request(environ)
+        request.encoding_errors = "strict"
+
+        if request.accept_mimetypes.quality("application/json") <= 0:
+            raise NotAcceptable()
+
+        result = list()
+        for task_id in iterkeys(self.task_store._store):
+            result.extend(itervalues(
+                self.scoring_store.get_submissions(args["user_id"], task_id)))
+        result.sort(key=lambda x: (x.task, x.time))
+        result = list(a.__dict__ for a in result)
+
+        response = Response()
+        response.status_code = 200
+        response.mimetype = "application/json"
+        response.data = json.dumps(result)
+
+        return response(environ, start_response)
 
 
-def HistoryHandler(request, response):
-    if request.accept_mimetypes.quality("application/json") <= 0:
-        raise NotAcceptable()
+class HistoryHandler(object):
 
-    result = list(Scoring.store.get_global_history())
+    def __init__(self, stores):
+        self.scoring_store = stores["scoring"]
 
-    response.status_code = 200
-    response.mimetype = "application/json"
-    response.data = json.dumps(result)
+    def __call__(self, environ, start_response):
+        return self.wsgi_app(environ, start_response)
+
+    def wsgi_app(self, environ, start_response):
+        request = Request(environ)
+        request.encoding_errors = "strict"
+
+        if request.accept_mimetypes.quality("application/json") <= 0:
+            raise NotAcceptable()
+
+        result = list(self.scoring_store.get_global_history())
+
+        response = Response()
+        response.status_code = 200
+        response.mimetype = "application/json"
+        response.data = json.dumps(result)
+
+        return response(environ, start_response)
 
 
-def ScoreHandler(request, response):
-    if request.accept_mimetypes.quality("application/json") <= 0:
-        raise NotAcceptable()
+class ScoreHandler(object):
 
-    result = dict()
-    for u_id, tasks in Scoring.store._scores.iteritems():
-        for t_id, score in tasks.iteritems():
-            if score.get_score() > 0.0:
-                result.setdefault(u_id, dict())[t_id] = score.get_score()
+    def __init__(self, stores):
+        self.scoring_store = stores["scoring"]
 
-    response.status_code = 200
-    response.headers[b'Timestamp'] = b"%0.6f" % time.time()
-    response.mimetype = "application/json"
-    response.data = json.dumps(result)
+    def __call__(self, environ, start_response):
+        return self.wsgi_app(environ, start_response)
+
+    def wsgi_app(self, environ, start_response):
+        request = Request(environ)
+        request.encoding_errors = "strict"
+
+        if request.accept_mimetypes.quality("application/json") <= 0:
+            raise NotAcceptable()
+
+        result = dict()
+        for u_id, tasks in iteritems(self.scoring_store._scores):
+            for t_id, score in iteritems(tasks):
+                if score.get_score() > 0.0:
+                    result.setdefault(u_id, dict())[t_id] = score.get_score()
+
+        response = Response()
+        response.status_code = 200
+        response.headers['Timestamp'] = "%0.6f" % time.time()
+        response.mimetype = "application/json"
+        response.data = json.dumps(result)
+
+        return response(environ, start_response)
 
 
 class ImageHandler(object):
@@ -336,15 +401,15 @@ class ImageHandler(object):
         'bmp': 'image/bmp'
     }
 
-    MIME_TO_EXT = dict((v, k) for k, v in EXT_TO_MIME.iteritems())
+    MIME_TO_EXT = dict((v, k) for k, v in iteritems(EXT_TO_MIME))
 
     def __init__(self, location, fallback):
         self.location = location
         self.fallback = fallback
 
-        self.router = Map(
-            [Rule("/<name>", methods=["GET"], endpoint="get"),
-             ], encoding_errors="strict")
+        self.router = Map([
+            Rule("/<name>", methods=["GET"], endpoint="get"),
+        ], encoding_errors="strict")
 
     def __call__(self, environ, start_response):
         return self.wsgi_app(environ, start_response)
@@ -365,7 +430,7 @@ class ImageHandler(object):
         response = Response()
 
         available = list()
-        for extension, mimetype in self.EXT_TO_MIME.iteritems():
+        for extension, mimetype in iteritems(self.EXT_TO_MIME):
             if os.path.isfile(location + '.' + extension):
                 available.append(mimetype)
         mimetype = request.accept_mimetypes.best_match(available)
@@ -390,18 +455,21 @@ class ImageHandler(object):
 
 
 class RoutingHandler(object):
-    def __init__(self, event_handler, logo_handler):
-        self.router = Map(
-            [Rule("/", methods=["GET"], endpoint="root"),
-             Rule("/sublist/<user_id>", methods=["GET"], endpoint="sublist"),
-             Rule("/history", methods=["GET"], endpoint="history"),
-             Rule("/scores", methods=["GET"], endpoint="scores"),
-             Rule("/events", methods=["GET"], endpoint="events"),
-             Rule("/logo", methods=["GET"], endpoint="logo"),
-             ], encoding_errors="strict")
+
+    def __init__(
+            self, event_handler, logo_handler, score_handler, history_handler):
+        self.router = Map([
+            Rule("/", methods=["GET"], endpoint="root"),
+            Rule("/history", methods=["GET"], endpoint="history"),
+            Rule("/scores", methods=["GET"], endpoint="scores"),
+            Rule("/events", methods=["GET"], endpoint="events"),
+            Rule("/logo", methods=["GET"], endpoint="logo"),
+        ], encoding_errors="strict")
 
         self.event_handler = event_handler
         self.logo_handler = logo_handler
+        self.score_handler = score_handler
+        self.history_handler = history_handler
         self.root_handler = redirect("Ranking.html")
 
     def __call__(self, environ, start_response):
@@ -420,64 +488,105 @@ class RoutingHandler(object):
             return self.logo_handler(environ, start_response)
         elif endpoint == "root":
             return self.root_handler(environ, start_response)
-        else:
-            request = Request(environ)
-            request.encoding_errors = "strict"
-
-            response = Response()
-
-            if endpoint == "sublist":
-                SubListHandler(request, response, args["user_id"])
-            elif endpoint == "scores":
-                ScoreHandler(request, response)
-            elif endpoint == "history":
-                HistoryHandler(request, response)
-
-            return response(environ, start_response)
+        elif endpoint == "scores":
+            return self.score_handler(environ, start_response)
+        elif endpoint == "history":
+            return self.history_handler(environ, start_response)
 
 
 def main():
     """Entry point for RWS.
 
-    return (bool): True if executed successfully.
+    return (int): exit code (0 on success, 1 on error)
 
     """
     parser = argparse.ArgumentParser(
         description="Ranking for CMS.")
+    parser.add_argument("--config", type=argparse.FileType("rt"),
+                        help="override config file")
     parser.add_argument("-d", "--drop", action="store_true",
                         help="drop the data already stored")
     args = parser.parse_args()
 
+    config = Config()
+    config.load(args.config)
+
     if args.drop:
-        print("Are you sure you want to delete directory %s? [y/N]" %
-              config.lib_dir, end='')
-        ans = raw_input().lower()
+        ans = input("Are you sure you want to delete directory %s? [y/N]" %
+                    config.lib_dir).strip().lower()
         if ans in ['y', 'yes']:
             print("Removing directory %s." % config.lib_dir)
             shutil.rmtree(config.lib_dir)
         else:
             print("Not removing directory %s." % config.lib_dir)
-        return False
+        return 1
 
-    toplevel_handler = RoutingHandler(DataWatcher(), ImageHandler(
-        os.path.join(config.lib_dir, '%(name)s'),
-        os.path.join(config.web_dir, 'img', 'logo.png')))
+    stores = dict()
+
+    stores["subchange"] = Store(
+        Subchange, os.path.join(config.lib_dir, 'subchanges'), stores)
+    stores["submission"] = Store(
+        Submission, os.path.join(config.lib_dir, 'submissions'), stores,
+        [stores["subchange"]])
+    stores["user"] = Store(
+        User, os.path.join(config.lib_dir, 'users'), stores,
+        [stores["submission"]])
+    stores["team"] = Store(
+        Team, os.path.join(config.lib_dir, 'teams'), stores,
+        [stores["user"]])
+    stores["task"] = Store(
+        Task, os.path.join(config.lib_dir, 'tasks'), stores,
+        [stores["submission"]])
+    stores["contest"] = Store(
+        Contest, os.path.join(config.lib_dir, 'contests'), stores,
+        [stores["task"]])
+
+    stores["contest"].load_from_disk()
+    stores["task"].load_from_disk()
+    stores["team"].load_from_disk()
+    stores["user"].load_from_disk()
+    stores["submission"].load_from_disk()
+    stores["subchange"].load_from_disk()
+
+    stores["scoring"] = ScoringStore(stores)
+    stores["scoring"].init_store()
+
+    toplevel_handler = RoutingHandler(
+        DataWatcher(stores, config.buffer_size),
+        ImageHandler(
+            os.path.join(config.lib_dir, '%(name)s'),
+            os.path.join(config.web_dir, 'img', 'logo.png')),
+        ScoreHandler(stores),
+        HistoryHandler(stores))
 
     wsgi_app = SharedDataMiddleware(DispatcherMiddleware(
-        toplevel_handler,
-        {'/contests': StoreHandler(Contest.store),
-         '/tasks': StoreHandler(Task.store),
-         '/teams': StoreHandler(Team.store),
-         '/users': StoreHandler(User.store),
-         '/submissions': StoreHandler(Submission.store),
-         '/subchanges': StoreHandler(Subchange.store),
-         '/faces': ImageHandler(
-             os.path.join(config.lib_dir, 'faces', '%(name)s'),
-             os.path.join(config.web_dir, 'img', 'face.png')),
-         '/flags': ImageHandler(
-             os.path.join(config.lib_dir, 'flags', '%(name)s'),
-             os.path.join(config.web_dir, 'img', 'flag.png')),
-         }), {'/': config.web_dir})
+        toplevel_handler, {
+            '/contests': StoreHandler(
+                stores["contest"],
+                config.username, config.password, config.realm_name),
+            '/tasks': StoreHandler(
+                stores["task"],
+                config.username, config.password, config.realm_name),
+            '/teams': StoreHandler(
+                stores["team"],
+                config.username, config.password, config.realm_name),
+            '/users': StoreHandler(
+                stores["user"],
+                config.username, config.password, config.realm_name),
+            '/submissions': StoreHandler(
+                stores["submission"],
+                config.username, config.password, config.realm_name),
+            '/subchanges': StoreHandler(
+                stores["subchange"],
+                config.username, config.password, config.realm_name),
+            '/faces': ImageHandler(
+                os.path.join(config.lib_dir, 'faces', '%(name)s'),
+                os.path.join(config.web_dir, 'img', 'face.png')),
+            '/flags': ImageHandler(
+                os.path.join(config.lib_dir, 'flags', '%(name)s'),
+                os.path.join(config.web_dir, 'img', 'flag.png')),
+            '/sublist': SubListHandler(stores),
+        }), {'/': config.web_dir})
 
     servers = list()
     if config.http_port is not None:
@@ -496,4 +605,4 @@ def main():
         pass
     finally:
         gevent.joinall(list(gevent.spawn(s.stop) for s in servers))
-    return True
+    return 0

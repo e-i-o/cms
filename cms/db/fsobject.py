@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
@@ -25,15 +25,17 @@
 """
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
 import io
 
-import six
-
 from sqlalchemy.schema import Column
-from sqlalchemy.types import Integer, String, Unicode
+from sqlalchemy.types import String, Unicode
+from sqlalchemy.dialects.postgresql import OID
 
 import psycopg2
 import psycopg2.extensions
@@ -117,7 +119,8 @@ class LargeObject(io.RawIOBase):
                     (LargeObject.INV_WRITE if self._writable else 0)
         self._fd = self._execute("SELECT lo_open(%(loid)s, %(mode)s);",
                                  {'loid': self.loid, 'mode': open_mode},
-                                 "Couldn't open large object.", cursor)
+                                 "Couldn't open large object with LOID "
+                                 "%s." % (self.loid), cursor)
 
         cursor.close()
 
@@ -163,7 +166,7 @@ class LargeObject(io.RawIOBase):
             res, = cursor.fetchone()
 
             assert len(cursor.fetchall()) == 0
-            if isinstance(res, six.integer_types):
+            if isinstance(res, int):
                 assert res >= 0
         except (AssertionError, ValueError, psycopg2.DatabaseError):
             raise IOError(message)
@@ -369,7 +372,7 @@ class FSObject(Base):
 
     # OID of the large object in the database
     loid = Column(
-        Integer,
+        OID,
         nullable=False,
         default=0)
 
@@ -392,10 +395,10 @@ class FSObject(Base):
              given, `rb' is used.
 
         """
+        assert self.loid != 0, "Expected LO to have already been created!"
         # Here we rely on the fact that we're using psycopg2 as
         # PostgreSQL backend.
         lobj = LargeObject(self.loid, mode)
-        self.loid = lobj.loid
 
         # FIXME Wrap with a io.BufferedReader/Writer/Random?
         return lobj

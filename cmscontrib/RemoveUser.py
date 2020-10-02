@@ -1,8 +1,9 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
-# Copyright © 2013 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2013-2016 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2016 Myungwoo Chun <mc.tamaki@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -22,23 +23,35 @@
 """
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
 import argparse
+import logging
 import sys
 
 from cms import utf8_decoder
-from cms.db import SessionGen, User, ask_for_contest
+from cms.db import SessionGen, User
 
 
-def remove_user(contest_id, username):
+logger = logging.getLogger(__name__)
+
+
+def remove_user(username):
     with SessionGen() as session:
         user = session.query(User)\
-            .filter(User.contest_id == contest_id)\
             .filter(User.username == username).first()
+        if user is None:
+            logger.error("User %s does not exist.", username)
+            return False
+
         session.delete(user)
         session.commit()
+
+    return True
 
 
 def main():
@@ -49,17 +62,10 @@ def main():
         description="Remove a user from a contest in CMS.")
     parser.add_argument("username", action="store", type=utf8_decoder,
                         help="username of the user")
-    parser.add_argument("-c", "--contest-id", action="store", type=int,
-                        help="id of contest the user is in")
     args = parser.parse_args()
 
-    if args.contest_id is None:
-        args.contest_id = ask_for_contest()
-
-    remove_user(contest_id=args.contest_id,
-                username=args.username)
-
-    return 0
+    success = remove_user(username=args.username)
+    return 0 if success is True else 1
 
 
 if __name__ == "__main__":

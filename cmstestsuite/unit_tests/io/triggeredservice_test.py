@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
@@ -22,8 +22,11 @@
 """
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
 import gevent
 import unittest
@@ -86,9 +89,6 @@ class FakeTriggeredService(TriggeredService):
     def add_missing_operation(self, operation):
         self._operations.append(operation)
 
-    def _sweeper_timeout(self):
-        return self._timeout
-
     def _missing_operations(self):
         counter = 0
         while self._operations != []:
@@ -114,6 +114,7 @@ class TestTriggeredService(unittest.TestCase):
         self.service = FakeTriggeredService(0, timeout)
         for notifier in self.notifiers:
             self.service.add_executor(FakeExecutor(notifier))
+        self.service.start_sweeper(timeout)
 
     def test_success(self):
         """Test a simple success case."""

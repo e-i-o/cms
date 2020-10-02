@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
@@ -22,8 +22,11 @@
 """
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
 import unittest
 
@@ -50,7 +53,6 @@ class TestPriorityQueue(unittest.TestCase):
 
     def tearDown(self):
         self.queue = PriorityQueue()
-        pass
 
     def test_success(self):
         """Verify a simple success case.

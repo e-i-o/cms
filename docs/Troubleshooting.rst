@@ -20,10 +20,12 @@ Database
 
   *Possible cause.* The default configuration of PostgreSQL may allow insufficiently many incoming connections on the database engine. You can raise this limit by tweaking the ```max_connections``` parameter in ```postgresql.conf``` (`see docs <http://www.postgresql.org/docs/9.1/static/runtime-config-connection.html>`_). This, in turn, requires more shared memory for the PostgreSQL process (see ```shared_buffers``` parameter in `docs <http://www.postgresql.org/docs/9.1/static/runtime-config-resource.html>`_), which may overflow the maximum limit allowed by the operating system. In such case see the suggestions in http://www.postgresql.org/docs/9.1/static/kernel-resources.html#SYSVIPC. Users reported that another way to go is to use a connection pooler like `PgBouncer <https://wiki.postgresql.org/wiki/PgBouncer>`_.
 
-  Slightly different, but related, is another issue: CMS may be unable to create new connections to the database because its pool is exhausted. In this case you probably want to modify the ```pool_size``` argument in :gh_blob:`cms/db/__init__.py` or try to spread your users over more instances of ContestWebServer.
-
 Servers
 =======
+
+- *Symptom.* Some HTTP requests to ContestWebServer take a long time and fail with 500 Internal Server Error. ContestWebServer logs contain entries such as :samp:`TimeoutError('QueuePool limit of size 5 overflow 10 reached, connection timed out, timeout 60',)`.
+
+  *Possible cause.* The server may be overloaded with user requests. You can try to increase the ```pool_timeout``` argument in :gh_blob:`cms/db/__init__.py` or, preferably, spread your users over more instances of ContestWebServer.
 
 - *Symptom.* Message from ContestWebServer such as: :samp:`WARNING:root:Invalid cookie signature KFZzdW5kdWRlCnAwCkkxMzI5MzQzNzIwCnRw...`
 
@@ -40,3 +42,22 @@ Sandbox
 - *Symptom.* The Worker fails to evaluate a submission logging about an invalid (empty) output from the manager.
 
   *Possible cause.* You might have been used a non-statically linked checker. The sandbox prevent dynamically linked executables to work. Try compiling the checker with ```-static```. Also, make sure that the checker was compiled for the architecture of the workers (e.g., 32 or 64 bits).
+
+- *Symptom.* The Worker fails to evaluate a submission with a generic failure.
+
+  *Possible cause.* Make sure that the isolate binary that CMS is using has the correct permissions (in particular, its owner is root and it has the suid bit set). Be careful of having multiple isolate binaries in your path. Another reason could be that you are using an old version of isolate.
+
+- *Symptom.* Contestants' solutions fail when trying to write large outputs.
+
+  *Possible cause.* CMS limits the maximum output size from programs being evaluated for security reasons. Currently the limit is 1 GB and can be configured by changing the parameter ``max_file_size`` in :file:`cms.conf`.
+
+Evaluations
+===========
+
+- *Symptom.* Submissions that should  exceed memory limit actually pass or exceed the time limits.
+
+  *Possible cause.* You have an active swap partition on the workers; isolate only limit physical memory, not swap usage. Disable the swap with ``sudo swapoff -a``.
+
+- *Symptom.* Re-running evaluations gives very different time or memory usage.
+
+  *Possible cause.* Make sure the workers are configured in a way to minimize resource usage variability, by following isolate's `guidelines <https://github.com/ioi/isolate/blob/c679ae936d8e8d64e5dab553bdf1b22261324315/isolate.1.txt#L292>`_ for reproducible results.

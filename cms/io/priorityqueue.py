@@ -1,8 +1,8 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
-# Copyright © 2014 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2014-2016 Stefano Maggiolo <s.maggiolo@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -40,10 +40,16 @@ together the three data point: item, priority, and timestamp.
 """
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
+from six import iteritems
 
 from gevent.event import Event
+
+from functools import total_ordering
 
 from cmscommon.datetime import make_datetime, make_timestamp
 
@@ -61,18 +67,20 @@ class QueueItem(object):
         return self.__dict__
 
 
+@total_ordering
 class QueueEntry(object):
 
     """Type of the actual objects in the queue.
 
     """
 
-    def __init__(self, item, priority, timestamp):
+    def __init__(self, item, priority, timestamp, index):
         """Create a QueueEntry object.
 
         item (QueueItem): the payload.
         priority (int): the priority.
         timestamp (datetime): the timestamp of first request.
+        index (int): used to enforce strict ordering.
 
         """
         # TODO: item is not actually necessary, as we store the whole
@@ -80,13 +88,17 @@ class QueueEntry(object):
         self.item = item
         self.priority = priority
         self.timestamp = timestamp
+        self.index = index
 
-    def __cmp__(self, other):
-        """Compare self's and other's priorities."""
-        if self.priority != other.priority:
-            return self.priority - other.priority
-        else:
-            return (self.timestamp - other.timestamp).total_seconds()
+    def __eq__(self, other):
+        """Return whether self and other have the same priority."""
+        return (self.priority, self.timestamp, self.index) \
+               == (other.priority, other.timestamp, other.index)
+
+    def __lt__(self, other):
+        """Return whether self has higher priority than other."""
+        return (self.priority, self.timestamp, self.index) \
+               < (other.priority, other.timestamp, other.index)
 
 
 class PriorityQueue(object):
@@ -121,6 +133,12 @@ class PriorityQueue(object):
         # Event to signal that there are items in the queue.
         self._event = Event()
 
+        # Index of the next element that will be added to the queue.
+        self._next_index = 0
+
+    def __len__(self):
+        return len(self._queue)
+
     def _verify(self):
         """Make sure that the internal state of the queue is consistent.
 
@@ -135,7 +153,7 @@ class PriorityQueue(object):
             return False
         if self._event.isSet() == self.empty():
             return False
-        for item, idx in self._reverse.iteritems():
+        for item, idx in iteritems(self._reverse):
             if self._queue[idx].item != item:
                 return False
         return True
@@ -237,7 +255,10 @@ class PriorityQueue(object):
         if timestamp is None:
             timestamp = make_datetime()
 
-        self._queue.append(QueueEntry(item, priority, timestamp))
+        index = self._next_index
+        self._next_index += 1
+
+        self._queue.append(QueueEntry(item, priority, timestamp, index))
         last = len(self._queue) - 1
         self._reverse[item] = last
         self._up_heap(last)

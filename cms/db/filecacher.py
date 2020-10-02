@@ -1,11 +1,12 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2010-2014 Giovanni Mascellani <mascellani@poisson.phc.unipi.it>
-# Copyright © 2010-2012 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2010-2018 Stefano Maggiolo <s.maggiolo@gmail.com>
 # Copyright © 2010-2012 Matteo Boscariol <boscarim@hotmail.com>
 # Copyright © 2013 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2016 Luca Versari <veluca93@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -25,10 +26,13 @@
 """
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
-import hashlib
+import atexit
 import io
 import logging
 import os
@@ -38,12 +42,50 @@ import gevent
 
 from sqlalchemy.exc import IntegrityError
 
-from cms import config, mkdir
-from cms.db import SessionGen, FSObject
-from cms.io.GeventUtils import copyfileobj, move, rmtree
+from cmscommon.digest import Digester
+from cms import config, mkdir, rmtree
+from cms.db import SessionGen, FSObject, LargeObject
 
 
 logger = logging.getLogger(__name__)
+
+
+def copyfileobj(source_fobj, destination_fobj,
+                buffer_size=io.DEFAULT_BUFFER_SIZE):
+    """Read all content from one file object and write it to another.
+
+    Repeatedly read from the given source file object, until no content
+    is left, and at the same time write the content to the destination
+    file object. Never read or write more than the given buffer size.
+    Be cooperative with other greenlets by yielding often.
+
+    source_fobj (fileobj): a file object open for reading, in either
+        binary or text mode (doesn't need to be buffered).
+    destination_fobj (fileobj): a file object open for writing, in the
+        same mode as the source (doesn't need to be buffered).
+    buffer_size (int): the size of the read/write buffer.
+
+    """
+    while True:
+        buffer = source_fobj.read(buffer_size)
+        if len(buffer) == 0:
+            break
+        while len(buffer) > 0:
+            gevent.sleep(0)
+            written = destination_fobj.write(buffer)
+            # FIXME remove this when we drop py2
+            if written is None:
+                break
+            buffer = buffer[written:]
+        gevent.sleep(0)
+
+
+class TombstoneError(RuntimeError):
+    """An error that represents the file cacher trying to read
+    files that have been deleted from the database.
+
+    """
+    pass
 
 
 class FileCacherBackend(object):
@@ -64,16 +106,37 @@ class FileCacherBackend(object):
         """
         raise NotImplementedError("Please subclass this class.")
 
-    def put_file(self, digest, desc=""):
-        """Store a file to the storage.
+    def create_file(self, digest):
+        """Create an empty file that will live in the storage.
+
+        Once the caller has written the contents to the file, the commit_file()
+        method must be called to commit it into the store.
 
         digest (unicode): the digest of the file to store.
-        desc (unicode): the optional description of the file to
-            store, intended for human beings.
 
         return (fileobj): a writable binary file-like object on which
             to write the contents of the file, or None if the file is
             already stored.
+
+        """
+        raise NotImplementedError("Please subclass this class.")
+
+    def commit_file(self, fobj, digest, desc=""):
+        """Commit a file created by create_file() to be stored.
+
+        Given a file object returned by create_file(), this function populates
+        the database to record that this file now legitimately exists and can
+        be used.
+
+        fobj (fileobj): the object returned by create_file()
+        digest (unicode): the digest of the file to store.
+        desc (unicode): the optional description of the file to
+            store, intended for human beings.
+
+        return (bool): True if the file was committed successfully, False if
+            there was already a file with the same digest in the database. This
+            shouldn't make any difference to the caller, except for testing
+            purposes!
 
         """
         raise NotImplementedError("Please subclass this class.")
@@ -161,16 +224,43 @@ class FSBackend(FileCacherBackend):
 
         return io.open(file_path, 'rb')
 
-    def put_file(self, digest, desc=""):
-        """See FileCacherBackend.put_file().
+    def create_file(self, digest):
+        """See FileCacherBackend.create_file().
 
         """
+        # Check if the file already exists. Return None if so, to inform the
+        # caller they don't need to store the file.
         file_path = os.path.join(self.path, digest)
 
         if os.path.exists(file_path):
             return None
 
-        return io.open(file_path, 'wb')
+        # Create a temporary file in the same directory
+        temp_file = tempfile.NamedTemporaryFile('wb', delete=False,
+                                                prefix=".tmp.",
+                                                suffix=digest,
+                                                dir=self.path)
+        return temp_file
+
+    def commit_file(self, fobj, digest, desc=""):
+        """See FileCacherBackend.commit_file().
+
+        """
+        fobj.close()
+
+        file_path = os.path.join(self.path, digest)
+        # Move it into place in the cache. Skip if it already exists, and
+        # delete the temporary file instead.
+        if not os.path.exists(file_path):
+            # There is a race condition here if someone else puts the file here
+            # between checking and renaming. Put it doesn't matter in practice,
+            # because rename will replace the file anyway (which should be
+            # identical).
+            os.rename(fobj.name, file_path)
+            return True
+        else:
+            os.unlink(fobj.name)
+            return False
 
     def describe(self, digest):
         """See FileCacherBackend.describe().
@@ -231,45 +321,53 @@ class DBBackend(FileCacherBackend):
 
             return fso.get_lobject(mode='rb')
 
-    def put_file(self, digest, desc=""):
-        """See FileCacherBackend.put_file().
+    def create_file(self, digest):
+        """See FileCacherBackend.create_file().
 
         """
+        with SessionGen() as session:
+            fso = FSObject.get_from_digest(digest, session)
+
+            # Check digest uniqueness
+            if fso is not None:
+                logger.debug("File %s already stored on database, not "
+                             "sending it again.", digest)
+                session.rollback()
+                return None
+
+            # If it is not already present, copy the file into the
+            # lobject
+            else:
+                # Create the large object first. This should be populated
+                # and committed before putting it into the FSObjects table.
+                return LargeObject(0, mode='wb')
+
+    def commit_file(self, fobj, digest, desc=""):
+        """See FileCacherBackend.commit_file().
+
+        """
+        fobj.close()
         try:
             with SessionGen() as session:
-                fso = FSObject.get_from_digest(digest, session)
+                fso = FSObject(description=desc)
+                fso.digest = digest
+                fso.loid = fobj.loid
 
-                # Check digest uniqueness
-                if fso is not None:
-                    logger.debug("File %s already stored on database, not "
-                                 "sending it again.", digest)
-                    session.rollback()
-                    return None
+                session.add(fso)
 
-                # If it is not already present, copy the file into the
-                # lobject
-                else:
-                    fso = FSObject(description=desc)
-                    fso.digest = digest
+                session.commit()
 
-                    session.add(fso)
-
-                    logger.debug("File %s stored on the database.", digest)
-
-                    # FIXME There is a remote possibility that someone
-                    # will try to access this file, believing it has
-                    # already been stored (since its FSObject exists),
-                    # while we're still sending its content.
-
-                    lobject = fso.get_lobject(mode='wb')
-
-                    session.commit()
-
-                    return lobject
+                logger.info("File %s (%s) stored on the database.",
+                            digest, desc)
 
         except IntegrityError:
-            logger.warning("File %s caused an IntegrityError, ignoring...",
-                           digest)
+            # If someone beat us to adding the same object to the database, we
+            # should at least drop the large object.
+            LargeObject.unlink(fobj.loid)
+            logger.warning("File %s (%s) caused an IntegrityError, ignoring.",
+                           digest, desc)
+            return False
+        return True
 
     def describe(self, digest):
         """See FileCacherBackend.describe().
@@ -348,8 +446,11 @@ class NullBackend(FileCacherBackend):
     def get_file(self, digest):
         raise KeyError("File not found.")
 
-    def put_file(self, digest, desc=""):
+    def create_file(self, digest):
         return None
+
+    def commit_file(self, fobj, digest, desc=""):
+        return False
 
     def describe(self, digest):
         raise KeyError("File not found.")
@@ -384,6 +485,9 @@ class FileCacher(object):
     # CHUNK_SIZE should be a multiple of these values.
     CHUNK_SIZE = 2 ** 14  # 16348
 
+    # The fake digest used to mark a file as deleted in the backend.
+    TOMBSTONE_DIGEST = "x"
+
     def __init__(self, service=None, path=None, null=False):
         """Initialize.
 
@@ -415,6 +519,9 @@ class FileCacher(object):
 
         if service is None:
             self.file_dir = tempfile.mkdtemp(dir=config.temp_dir)
+            # Delete this directory on exit since it has a random name and
+            # won't be used again.
+            atexit.register(lambda: rmtree(self.file_dir))
         else:
             self.file_dir = os.path.join(
                 config.cache_dir,
@@ -422,10 +529,11 @@ class FileCacher(object):
 
         self.temp_dir = os.path.join(self.file_dir, "_temp")
 
-        if not mkdir(config.cache_dir) or not mkdir(self.file_dir) \
-                or not mkdir(self.temp_dir):
+        if not mkdir(config.cache_dir) or not mkdir(config.temp_dir) \
+                or not mkdir(self.file_dir) or not mkdir(self.temp_dir):
             logger.error("Cannot create necessary directories.")
             raise RuntimeError("Cannot create necessary directories.")
+        atexit.register(lambda: rmtree(self.temp_dir))
 
     def load(self, digest, if_needed=False):
         """Load the file with the given digest into the cache.
@@ -438,24 +546,20 @@ class FileCacher(object):
             the local cache.
 
         raise (KeyError): if the backend cannot find the file.
+        raise (TombstoneError): if the digest is the tombstone
 
         """
+        if digest == FileCacher.TOMBSTONE_DIGEST:
+            raise TombstoneError()
         cache_file_path = os.path.join(self.file_dir, digest)
         if if_needed and os.path.exists(cache_file_path):
             return
 
         ftmp_handle, temp_file_path = tempfile.mkstemp(dir=self.temp_dir,
                                                        text=False)
-        ftmp = os.fdopen(ftmp_handle, 'w')
-
-        fobj = self.backend.get_file(digest)
-
-        # Copy the file to a temporary position
-        try:
+        with io.open(ftmp_handle, 'wb') as ftmp, \
+                self.backend.get_file(digest) as fobj:
             copyfileobj(fobj, ftmp, self.CHUNK_SIZE)
-        finally:
-            ftmp.close()
-            fobj.close()
 
         # Then move it to its real location (this operation is atomic
         # by POSIX requirement)
@@ -478,8 +582,11 @@ class FileCacher(object):
             to read the contents of the file.
 
         raise (KeyError): if the file cannot be found.
+        raise (TombstoneError): if the digest is the tombstone
 
         """
+        if digest == FileCacher.TOMBSTONE_DIGEST:
+            raise TombstoneError()
         cache_file_path = os.path.join(self.file_dir, digest)
 
         logger.debug("Getting file %s.", digest)
@@ -505,8 +612,11 @@ class FileCacher(object):
         return (bytes): the content of the retrieved file.
 
         raise (KeyError): if the file cannot be found.
+        raise (TombstoneError): if the digest is the tombstone
 
         """
+        if digest == FileCacher.TOMBSTONE_DIGEST:
+            raise TombstoneError()
         with self.get_file(digest) as src:
             return src.read()
 
@@ -521,8 +631,11 @@ class FileCacher(object):
             write the contents of the file.
 
         raise (KeyError): if the file cannot be found.
+        raise (TombstoneError): if the digest is the tombstone
 
         """
+        if digest == FileCacher.TOMBSTONE_DIGEST:
+            raise TombstoneError()
         with self.get_file(digest) as src:
             copyfileobj(src, dst, self.CHUNK_SIZE)
 
@@ -539,6 +652,8 @@ class FileCacher(object):
         raise (KeyError): if the file cannot be found.
 
         """
+        if digest == FileCacher.TOMBSTONE_DIGEST:
+            raise TombstoneError()
         with self.get_file(digest) as src:
             with io.open(dst_path, 'wb') as dst:
                 copyfileobj(src, dst, self.CHUNK_SIZE)
@@ -553,19 +668,22 @@ class FileCacher(object):
         desc (unicode): the (optional) description to associate to the
             file.
 
+        raise (TombstoneError): if the digest is the tombstone
+
         """
+        if digest == FileCacher.TOMBSTONE_DIGEST:
+            raise TombstoneError()
         cache_file_path = os.path.join(self.file_dir, digest)
 
-        fobj = self.backend.put_file(digest, desc)
+        fobj = self.backend.create_file(digest)
 
         if fobj is None:
             return
 
-        try:
-            with io.open(cache_file_path, 'rb') as src:
-                copyfileobj(src, fobj, self.CHUNK_SIZE)
-        finally:
-            fobj.close()
+        with io.open(cache_file_path, 'rb') as src:
+            copyfileobj(src, fobj, self.CHUNK_SIZE)
+
+        self.backend.commit_file(fobj, digest, desc)
 
     def put_file_from_fobj(self, src, desc=""):
         """Store a file in the storage.
@@ -595,11 +713,11 @@ class FileCacher(object):
         # compressed or require network communication).
         # XXX We're *almost* reimplementing copyfileobj.
         with tempfile.NamedTemporaryFile('wb', delete=False,
-                                         dir=config.temp_dir) as dst:
-            hasher = hashlib.sha1()
+                                         dir=self.temp_dir) as dst:
+            d = Digester()
             buf = src.read(self.CHUNK_SIZE)
             while len(buf) > 0:
-                hasher.update(buf)
+                d.update(buf)
                 while len(buf) > 0:
                     written = dst.write(buf)
                     # Cooperative yield.
@@ -608,7 +726,7 @@ class FileCacher(object):
                         break
                     buf = buf[written:]
                 buf = src.read(self.CHUNK_SIZE)
-            digest = hasher.hexdigest().decode("ascii")
+            digest = d.digest()
             dst.flush()
 
             logger.debug("File has digest %s.", digest)
@@ -616,7 +734,7 @@ class FileCacher(object):
             cache_file_path = os.path.join(self.file_dir, digest)
 
             if not os.path.exists(cache_file_path):
-                move(dst.name, cache_file_path)
+                os.rename(dst.name, cache_file_path)
             else:
                 os.unlink(dst.name)
 
@@ -671,6 +789,8 @@ class FileCacher(object):
         raise (KeyError): if the file cannot be found.
 
         """
+        if digest == FileCacher.TOMBSTONE_DIGEST:
+            raise TombstoneError()
         return self.backend.describe(digest)
 
     def get_size(self, digest):
@@ -682,8 +802,11 @@ class FileCacher(object):
         return (int): the size of the file, in bytes.
 
         raise (KeyError): if the file cannot be found.
+        raise (TombstoneError): if the digest is the tombstone
 
         """
+        if digest == FileCacher.TOMBSTONE_DIGEST:
+            raise TombstoneError()
         return self.backend.get_size(digest)
 
     def delete(self, digest):
@@ -692,6 +815,8 @@ class FileCacher(object):
         digest (unicode): the digest of the file to delete.
 
         """
+        if digest == FileCacher.TOMBSTONE_DIGEST:
+            return
         self.drop(digest)
         self.backend.delete(digest)
 
@@ -701,6 +826,8 @@ class FileCacher(object):
         digest (unicode): the file to delete.
 
         """
+        if digest == FileCacher.TOMBSTONE_DIGEST:
+            return
         cache_file_path = os.path.join(self.file_dir, digest)
 
         try:
@@ -750,17 +877,14 @@ class FileCacher(object):
 
         """
         clean = True
-        for digest, description in self.list():
-            fobj = self.backend.get_file(digest)
-            hasher = hashlib.sha1()
-            try:
+        for digest, _ in self.list():
+            d = Digester()
+            with self.backend.get_file(digest) as fobj:
                 buf = fobj.read(self.CHUNK_SIZE)
                 while len(buf) > 0:
-                    hasher.update(buf)
+                    d.update(buf)
                     buf = fobj.read(self.CHUNK_SIZE)
-            finally:
-                fobj.close()
-            computed_digest = hasher.hexdigest().decode("ascii")
+            computed_digest = d.digest()
             if digest != computed_digest:
                 logger.error("File with hash %s actually has hash %s",
                              digest, computed_digest)

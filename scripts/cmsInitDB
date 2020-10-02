@@ -1,8 +1,9 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2013-2014 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2016 Stefano Maggiolo <s.maggiolo@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -26,8 +27,11 @@ idempotent).
 """
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *
+from future.builtins import *
 
 # We enable monkey patching to make many libraries gevent-friendly
 # (for instance, urllib3, used by requests)
@@ -54,12 +58,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     args = parser.parse_args()
 
-    return init_db()
+    success = init_db()
+    return 0 if success is True else 1
 
 
 if __name__ == "__main__":
     try:
-        sys.exit(0 if main() is True else 1)
+        sys.exit(main())
     except ConfigError as error:
-        logger.critical(error.message)
+        logger.critical(error)
         sys.exit(1)

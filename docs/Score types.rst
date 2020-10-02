@@ -10,9 +10,9 @@ For every submission, the score type of a task comes into play after the :doc:`t
 Standard score types
 ====================
 
-Like task types, CMS has the most common score types built in. They are Sum, GroupMin, GroupMul, GroupThreshold. There is also a score type called Relative, but it is an experiment not meant for usage.
+CMS ships with the following score types: Sum, GroupMin, GroupMul, GroupThreshold.
 
-The first of the four well-tested score types, Sum, is the simplest you can imagine, just assigning a certain amount of points for each correct testcases. The other three are useful for grouping together testcases and assigning points for that group only if some conditions held. Groups are also known as subtasks in some contests. The group score types also allow test cases to be weighted, even for groups of size 1.
+The first of the four well-tested score types, Sum, is the simplest you can imagine, just assigning a fixed amount of points for each correct testcase. The other three are useful for grouping together testcases and assigning points for that group only if some conditions held. Groups are also known as subtasks in some contests. The group score types also allow test cases to be weighted, even for groups of size 1.
 
 Also like task types, the behavior of score types is configurable from the task's page in AdminWebServer.
 
@@ -32,9 +32,13 @@ For example, if there are 20 testcases, 2 of which are public, and the parameter
 GroupMin
 --------
 
-With the GroupMin score type, outcomes are again treated as a measure of correctness, from 0.0 (incorrect) to 1.0 (correct); testcases are split into groups, and each group has an integral multiplier. The score is the sum, over all groups, of the minimum outcome for that group times the multiplier. The public score is computed over all groups in which all testcases within are public.
+With the GroupMin score type, outcomes are again treated as a measure of correctness, from 0.0 (incorrect) to 1.0 (correct); testcases are split into groups, and each group has an integral multiplier. The score is the sum of the score of each group, which in turn is the minimum outcome within the group times the multiplier. The public score is computed over all groups whose testcases are all public.
 
-More precisely, the parameters string for GroupMin is of the form :samp:`[[{m1}, {t1}], [{m2}, {t2}], ...]`, meaning that the first group comprises the first :samp:`{t1}` testcases and has multiplier :samp:`{m1}`; the second group comprises the testcases from the :samp:`{t1}` + 1 to the :samp:`{t1}` + :samp:`{t2}` and has multiplier :samp:`{m2}`; and so on.
+The parameters string for GroupMin is of the form :samp:`[[{m1}, {t1}], [{m2}, {t2}], ...]`, where for each pair the first element is the multiplier, and the second is either always an integer, or always a string.
+
+In the first case (second element is always an integer), the integer is interpreted as the number of testcases that the group consumes (ordered by codename). That is, the first group comprises the first :samp:`{t1}` testcases and has multiplier :samp:`{m1}`; the second group comprises the testcases from the :samp:`{t1}` + 1 to the :samp:`{t1}` + :samp:`{t2}` and has multiplier :samp:`{m2}`; and so on.
+
+In the second case (second element is always a string), the string is interpreted as a regular expression, and the group comprises all testcases whose codename satisfies it.
 
 
 GroupMul
@@ -46,6 +50,16 @@ GroupMul is almost the same as GroupMin; the only difference is that instead of 
 GroupThreshold
 --------------
 
-GroupThreshold thinks of the outcomes not as a measure of success, but as an amount of resources used by the submission to solve the testcase. The testcase is then successfully solved if the outcome is between 0.0 and a certain number, the threshold, specified separately for each group.
+GroupThreshold thinks of the outcomes not as a measure of success, but as an amount of resources used by the submission to solve the testcase. The testcase is then successfully solved if the outcome is between 0.0 (excluded, as 0.0 is a special value used by many task types, for example when the contestant solution times out) and a certain number, the threshold, specified separately for each group.
 
 The parameter string is of the form :samp:`[[{m1}, {t1}, {T1}], [{m2}, {t2}, {T2}], ...]` where the additional parameter :samp:`{T}` for each group is the threshold.
+
+The task needs to be crafted in such a way that the meaning of the outcome is appropriate for this score type.
+
+For Batch tasks, this means that the tasks creates the outcome through a comparator program. Using diff does not make sense given that its outcomes can only be 0.0 or 1.0.
+
+
+Custom score types
+==================
+
+Additional score types can be defined if necessary. This works in the same way :ref:`as with task types <tasktypes_custom>`: the classes need to extend :py:class:`cms.grading.ScoreType.ScoreType` and the entry point group is called `cms.grading.scoretypes`.

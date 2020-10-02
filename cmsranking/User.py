@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
@@ -18,14 +18,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
-
-import six
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
 from cmsranking.Entity import Entity, InvalidData
-from cmsranking.Store import Store
-from cmsranking.Submission import store as submission_store
 
 
 class User(Entity):
@@ -56,12 +55,12 @@ class User(Entity):
         try:
             assert isinstance(data, dict), \
                 "Not a dictionary"
-            assert isinstance(data['f_name'], six.text_type), \
+            assert isinstance(data['f_name'], str), \
                 "Field 'f_name' isn't a string"
-            assert isinstance(data['l_name'], six.text_type), \
+            assert isinstance(data['l_name'], str), \
                 "Field 'l_name' isn't a string"
             assert data['team'] is None or \
-                isinstance(data['team'], six.text_type), \
+                isinstance(data['team'], str), \
                 "Field 'team' isn't a string (or null)"
         except KeyError as exc:
             raise InvalidData("Field %s is missing" % exc.message)
@@ -79,9 +78,6 @@ class User(Entity):
         del result['key']
         return result
 
-    def consistent(self):
-        from cmsranking.Team import store as team_store
-        return self.team is None or self.team in team_store
-
-
-store = Store(User, 'users', [submission_store])
+    def consistent(self, stores):
+        return self.team is None or "team" not in stores \
+               or self.team in stores["team"]

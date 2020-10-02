@@ -1,9 +1,9 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2010-2013 Giovanni Mascellani <mascellani@poisson.phc.unipi.it>
-# Copyright © 2010-2012 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2010-2018 Stefano Maggiolo <s.maggiolo@gmail.com>
 # Copyright © 2010-2012 Matteo Boscariol <boscarim@hotmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
@@ -19,38 +19,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""This directory holds utilities to import and export data to and
-from CMS for different formats. Examples are ContestImport and
-ContestExport, whose aim is to be one the inverse of the other (hence
-losing no data in the process).
-
-"""
+"""Utilities for cmscontrib"""
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
-import hashlib
 import io
 import os
-
-
-def sha1sum(path):
-    """Calculates the SHA1 sum of a file, given by its path.
-
-    path (string): path of the file we are interested in.
-
-    return (string): SHA1 sum of the file in path.
-
-    """
-    buffer_length = 8192
-    with io.open(path, 'rb') as fin:
-        hasher = hashlib.new("sha1")
-        buf = fin.read(buffer_length)
-        while buf != b'':
-            hasher.update(buf)
-            buf = fin.read(buffer_length)
-        return hasher.hexdigest()
 
 
 # Taken from

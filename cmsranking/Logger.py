@@ -1,8 +1,8 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
-# Copyright © 2011-2013 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2011-2016 Luca Wehrstedt <luca.wehrstedt@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -18,8 +18,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
 import curses
 import logging
@@ -28,9 +31,7 @@ import sys
 import time
 from traceback import format_tb
 
-import gevent.coros
-
-from cmsranking.Config import config
+import gevent.lock
 
 
 class StreamHandler(logging.StreamHandler):
@@ -44,7 +45,7 @@ class StreamHandler(logging.StreamHandler):
         """Set self.lock to a new gevent RLock.
 
         """
-        self.lock = gevent.coros.RLock()
+        self.lock = gevent.lock.RLock()
 
 
 class FileHandler(logging.FileHandler):
@@ -58,7 +59,7 @@ class FileHandler(logging.FileHandler):
         """Set self.lock to a new gevent RLock.
 
         """
-        self.lock = gevent.coros.RLock()
+        self.lock = gevent.lock.RLock()
 
 
 def has_color_support(stream):
@@ -226,7 +227,7 @@ class CustomFormatter(logging.Formatter):
 
         try:
             message = record.getMessage()
-        except Exception, exc:
+        except Exception as exc:
             message = 'Bad message (%r): %r' % (exc, record.__dict__)
 
         result += message.strip()
@@ -254,10 +255,16 @@ shell_handler.setLevel(logging.INFO)
 shell_handler.setFormatter(CustomFormatter(has_color_support(sys.stdout)))
 root_logger.addHandler(shell_handler)
 
-# Define the file handler to output on the specified log directory.
-log_filename = time.strftime("%Y-%m-%d-%H-%M-%S.log")
-file_handler = FileHandler(os.path.join(config.log_dir, log_filename),
-                           mode='w', encoding='utf-8')
-file_handler.setLevel(logging.INFO)
-file_handler.setFormatter(CustomFormatter(False))
-root_logger.addHandler(file_handler)
+
+def add_file_handler(log_dir):
+    """Install a handler that writes in files in the given directory.
+
+    log_dir (str): a path to a directory.
+
+    """
+    log_filename = time.strftime("%Y-%m-%d-%H-%M-%S.log")
+    file_handler = FileHandler(os.path.join(log_dir, log_filename),
+                               mode='w', encoding='utf-8')
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(CustomFormatter(False))
+    root_logger.addHandler(file_handler)

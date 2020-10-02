@@ -13,7 +13,7 @@ To start RWS you have to execute ``cmsRankingWebServer``.
 Configuring it
 --------------
 
-The configuration file is named :file:`cms.ranking.conf` and RWS will search for it in :file:`/usr/local/etc` and in :file:`/etc` (in this order!). In case it's not found in any of these, RWS will use a hard-coded default configuration that can be found in :gh_blob:`cmsranking/Config.py`. If RWS is not installed then the :gh_tree:`examples` directory will also be checked for configuration files (note that for this to work your working directory needs to be root of the repository). In any case, as soon as you start it, RWS will tell you which configuration file it's using.
+The configuration file is named :file:`cms.ranking.conf` and RWS will search for it in :file:`/usr/local/etc` and in :file:`/etc` (in this order!). In case it's not found in any of these, RWS will use a hard-coded default configuration that can be found in :gh_blob:`cmsranking/Config.py`. If RWS is not installed then the :gh_tree:`config` directory will also be checked for configuration files (note that for this to work your working directory needs to be root of the repository). In any case, as soon as you start it, RWS will tell you which configuration file it's using.
 
 The configuration file is a JSON object. The most important parameters are:
 
@@ -45,19 +45,19 @@ where ``scheme`` can be either ``http`` or ``https``, ``username``, ``password``
 
 You also need to make sure that RWS is able to keep enough simultaneously active connections by checking that the maximum number of open file descriptors is larger than the expected number of clients. You can see the current value with ``ulimit -Sn`` (or ``-Sa`` to see all limitations) and change it with ``ulimit -Sn <value>``. This value will be reset when you open a new shell, so remember to run the command again. Note that there may be a hard limit that you cannot overcome (use ``-H`` instead of ``-S`` to see it). If that's still too low you can start multiple RWSs and use a proxy to distribute clients among them (see :ref:`rankingwebserver_using-a-proxy`).
 
-Managing it
-===========
+Managing data
+=============
 
 RWS doesn't use the PostgreSQL database. Instead, it stores its data in :file:`/var/local/lib/cms/ranking` (or whatever directory is given as ``lib_dir`` in the configuration file) as a collection of JSON files. Thus, if you want to backup the RWS data, just make a copy of that directory. RWS modifies this data in response to specific (authenticated) HTTP requests it receives.
 
-The intended way to get data to RWS is to have the rest of CMS send it. The service responsible for that is ProxyService (PS for short). When PS is started for a certain contest, it will send the data for that contest to all RWSs it knows about (i.e. those in its configuration). This data includes the contest itself (its name, its begin and end times, etc.), its tasks, its users and the submissions received so far. Then it will continue to send new submissions as soon as they are scored and it will update them as needed (for example when a user uses a token). Note that hidden users (and their submissions) will not be sent to RWS.
+The intended way to get data to RWS is to have the rest of CMS send it. The service responsible for that is ProxyService (PS for short). When PS is started for a certain contest, it will send the data for that contest to all RWSs it knows about (i.e. those in its configuration). This data includes the contest itself (its name, its begin and end times, etc.), its tasks, its users and teams, and the submissions received so far. Then it will continue to send new submissions as soon as they are scored and it will update them as needed (for example when a user uses a token). Note that hidden users (and their submissions) will not be sent to RWS.
 
-There are also other ways to insert data into RWS: send custom HTTP requests or directly write JSON files. They are both discouraged but, at the moment, they are the only way to add team information to RWS (see :gh_issue:`65`).
+There are also other ways to insert data into RWS: send custom HTTP requests or directly write JSON files. For the former, the script `cmsRWSHelper` can be used to handle the low level communication.
 
 Logo, flags and faces
 ---------------------
 
-RWS can also display a custom global logo, a flag for each team and a photo ("face") for each user. Again, the only way to add these is to put them directly in the data directory of RWS:
+RWS can also display a custom global logo, a flag for each team and a photo ("face") for each user. The only way to add these is to put them directly in the data directory of RWS:
 
 * the logo has to be saved right in the data directory, named "logo" with an appropriate extension (e.g. :file:`logo.png`), with a recommended resolution of 200x160;
 * the flag for a team has to be saved in the "flags" subdirectory, named as the team's name with an appropriate extension (e.g. :file:`ITA.png`);
@@ -198,7 +198,7 @@ Some final suggestions
 
 The suggested setup (the one that we also used at the IOI 2012) is to make RWS listen on both HTTP and HTTPS ports (we used 8080 and 8443), to use nginx to map port 80 to port 8080, to make all three ports (80, 8080 and 8443) accessible from the internet, to make PS connect to RWS via HTTPS on port 8443 and to use a Certificate Authority to generate certificates (the last one is probably an overkill).
 
-At the IOI we had only one server, running on a 2 GHz machine, and we were able to serve about 1500 clients simultaneously (and, probably, we were limited to this value by a misconfiguration of nginx). This is to say that you'll likely need only one public RWS server.
+At the IOI 2012, we had only one server, running on a 2 GHz machine, and we were able to serve about 1500 clients simultaneously (and, probably, we were limited to this value by a misconfiguration of nginx). This is to say that you'll likely need only one public RWS server.
 
 If you're starting RWS on your server remotely, for example via SSH, make sure the ``screen`` command is your friend :-).
 

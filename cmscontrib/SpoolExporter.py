@@ -1,9 +1,9 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2010-2012 Giovanni Mascellani <mascellani@poisson.phc.unipi.it>
-# Copyright © 2010-2012 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2010-2017 Stefano Maggiolo <s.maggiolo@gmail.com>
 # Copyright © 2010-2012 Matteo Boscariol <boscarim@hotmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
@@ -19,30 +19,40 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# FIXME: update to latest database version 15
+
 """This service creates a tree structure "similar" to the one used in
 Italian IOI repository for storing the results of a contest.
 
 """
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
+from six import iterkeys, iteritems
 
 # We enable monkey patching to make many libraries gevent-friendly
 # (for instance, urllib3, used by requests)
 import gevent.monkey
-gevent.monkey.patch_all()
+gevent.monkey.patch_all()  # noqa
 
 import argparse
 import io
 import logging
 import os
+import sys
 import time
 
+from sqlalchemy import not_
+
 from cms import utf8_decoder
-from cms.db import SessionGen, Contest, ask_for_contest
+from cms.db import SessionGen, Contest, ask_for_contest, Submission, \
+    Participation, get_submissions
 from cms.db.filecacher import FileCacher
-from cms.grading.scoretypes import get_score_type
+from cms.grading import languagemanager, task_score
 
 
 logger = logging.getLogger(__name__)
@@ -85,16 +95,16 @@ class SpoolExporter(object):
 
         with SessionGen() as session:
             self.contest = Contest.get_from_id(self.contest_id, session)
-            self.submissions = sorted(
-                (submission
-                 for submission in self.contest.get_submissions()
-                 if not submission.user.hidden),
-                key=lambda submission: submission.timestamp)
+            self.submissions = \
+                get_submissions(session, contest_id=self.contest_id) \
+                .filter(not_(Participation.hidden)) \
+                .order_by(Submission.timestamp).all()
 
             # Creating users' directory.
-            for user in self.contest.users:
-                if not user.hidden:
-                    os.mkdir(os.path.join(self.upload_dir, user.username))
+            for participation in self.contest.participations:
+                if not participation.hidden:
+                    os.mkdir(os.path.join(
+                        self.upload_dir, participation.user.username))
 
             try:
                 self.export_submissions()
@@ -117,30 +127,29 @@ class SpoolExporter(object):
         queue_file = io.open(os.path.join(self.spool_dir, "queue"), "w",
                              encoding="utf-8")
         for submission in sorted(self.submissions, key=lambda x: x.timestamp):
-            logger.info("Exporting submission %s." % submission.id)
-            username = submission.user.username
+            logger.info("Exporting submission %s.", submission.id)
+            username = submission.participation.user.username
             task = submission.task.name
             timestamp = time.mktime(submission.timestamp.timetuple())
 
             # Get source files to the spool directory.
+            ext = languagemanager.get_language(submission.language)\
+                .source_extension
             submission_dir = os.path.join(
-                self.upload_dir, username, "%s.%d.%s" %
-                (task, timestamp, submission.language))
+                self.upload_dir, username, "%s.%d.%s" % (task, timestamp, ext))
             os.mkdir(submission_dir)
-            for filename, file_ in submission.files.iteritems():
+            for filename, file_ in iteritems(submission.files):
                 self.file_cacher.get_file_to_path(
                     file_.digest,
-                    os.path.join(submission_dir, filename))
+                    os.path.join(submission_dir, filename.replace(".%l", ext)))
             last_submission_dir = os.path.join(
-                self.upload_dir, username, "%s.%s" %
-                (task, submission.language))
+                self.upload_dir, username, "%s.%s" % (task, ext))
             try:
                 os.unlink(last_submission_dir)
             except OSError:
                 pass
             os.symlink(os.path.basename(submission_dir), last_submission_dir)
-            print("./upload/%s/%s.%d.%s" %
-                  (username, task, timestamp, submission.language),
+            print("./upload/%s/%s.%d.%s" % (username, task, timestamp, ext),
                   file=queue_file)
 
             # Write results file for the submission.
@@ -149,13 +158,11 @@ class SpoolExporter(object):
             if result.evaluated():
                 res_file = io.open(os.path.join(
                     self.spool_dir,
-                    "%d.%s.%s.%s.res" % (timestamp, username,
-                                         task, submission.language)),
+                    "%d.%s.%s.%s.res" % (timestamp, username, task, ext)),
                     "w", encoding="utf-8")
                 res2_file = io.open(
                     os.path.join(self.spool_dir,
-                                 "%s.%s.%s.res" % (username, task,
-                                                   submission.language)),
+                                 "%s.%s.%s.res" % (username, task, ext)),
                     "w", encoding="utf-8")
                 total = 0.0
                 for evaluation in result.evaluations:
@@ -172,7 +179,7 @@ class SpoolExporter(object):
                 res_file.close()
                 res2_file.close()
 
-        print(file=queue_file)
+        print("", file=queue_file)
         queue_file.close()
 
     def export_ranking(self):
@@ -182,61 +189,28 @@ class SpoolExporter(object):
         logger.info("Exporting ranking.")
 
         # Create the structure to store the scores.
-        scores = dict((user.username, 0.0)
-                      for user in self.contest.users
-                      if not user.hidden)
-        task_scores = dict((task.id, dict((user.username, 0.0)
-                                          for user in self.contest.users
-                                          if not user.hidden))
-                           for task in self.contest.tasks)
-        last_scores = dict((task.id, dict((user.username, 0.0)
-                                          for user in self.contest.users
-                                          if not user.hidden))
-                           for task in self.contest.tasks)
+        scores = dict((participation.user.username, 0.0)
+                      for participation in self.contest.participations
+                      if not participation.hidden)
+        task_scores = dict(
+            (task.id, dict((participation.user.username, 0.0)
+                           for participation in self.contest.participations
+                           if not participation.hidden))
+            for task in self.contest.tasks)
 
-        # Make the score type compute the scores.
-        scorers = {}
+        is_partial = False
         for task in self.contest.tasks:
-            scorers[task.id] = get_score_type(dataset=task.active_dataset)
+            for participation in self.contest.participations:
+                if participation.hidden:
+                    continue
+                score, partial = task_score(participation, task)
+                is_partial = is_partial or partial
+                task_scores[task.id][participation.user.username] = score
+                scores[participation.user.username] += score
+        if is_partial:
+            logger.warning("Some of the scores are not definitive.")
 
-        for submission in self.submissions:
-            active_dataset = submission.task.active_dataset
-            result = submission.get_result(active_dataset)
-            scorers[submission.task_id].add_submission(
-                submission.id, submission.timestamp,
-                submission.user.username,
-                result.evaluated(),
-                dict((ev.codename,
-                      {"outcome": ev.outcome,
-                       "text": ev.text,
-                       "time": ev.execution_time,
-                       "memory": ev.execution_memory})
-                     for ev in result.evaluations),
-                submission.tokened())
-
-        # Put together all the scores.
-        for submission in self.submissions:
-            task_id = submission.task_id
-            username = submission.user.username
-            details = scorers[task_id].pool[submission.id]
-            last_scores[task_id][username] = details["score"]
-            if details["tokened"]:
-                task_scores[task_id][username] = max(
-                    task_scores[task_id][username],
-                    details["score"])
-
-        # Merge tokened and last submissions.
-        for username in scores:
-            for task_id in task_scores:
-                task_scores[task_id][username] = max(
-                    task_scores[task_id][username],
-                    last_scores[task_id][username])
-            # print(username, [task_scores[task_id][username]
-            #                  for task_id in task_scores])
-            scores[username] = sum(task_scores[task_id][username]
-                                   for task_id in task_scores)
-
-        sorted_usernames = sorted(scores.keys(),
+        sorted_usernames = sorted(iterkeys(scores),
                                   key=lambda username: (scores[username],
                                                         username),
                                   reverse=True)
@@ -244,22 +218,22 @@ class SpoolExporter(object):
                               key=lambda task: task.num)
 
         ranking_file = io.open(
-            os.path.join(self.spool_dir, "classifica.txt"),
+            os.path.join(self.spool_dir, "ranking.txt"),
             "w", encoding="utf-8")
         ranking_csv = io.open(
-            os.path.join(self.spool_dir, "classifica.csv"),
+            os.path.join(self.spool_dir, "ranking.csv"),
             "w", encoding="utf-8")
 
         # Write rankings' header.
         n_tasks = len(sorted_tasks)
-        print("Classifica finale del contest `%s'" %
+        print("Final Ranking of Contest `%s'" %
               self.contest.description, file=ranking_file)
         points_line = " %10s" * n_tasks
         csv_points_line = ",%s" * n_tasks
-        print(("%20s %10s" % ("Utente", "Totale")) +
+        print(("%20s %10s" % ("User", "Total")) +
               (points_line % tuple([t.name for t in sorted_tasks])),
               file=ranking_file)
-        print(("%s,%s" % ("utente", "totale")) +
+        print(("%s,%s" % ("user", "total")) +
               (csv_points_line % tuple([t.name for t in sorted_tasks])),
               file=ranking_csv)
 
@@ -295,9 +269,11 @@ def main():
     if args.contest_id is None:
         args.contest_id = ask_for_contest()
 
-    SpoolExporter(contest_id=args.contest_id,
-                  spool_dir=args.export_directory).run()
+    exporter = SpoolExporter(contest_id=args.contest_id,
+                             spool_dir=args.export_directory)
+    success = exporter.run()
+    return 0 if success is True else 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
@@ -22,14 +22,18 @@
 """
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
 from sqlalchemy.schema import Column, ForeignKey
 from sqlalchemy.types import Integer, String, Unicode, DateTime, Boolean
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import ARRAY
 
-from . import Base, User
+from . import Base, Participation, FilenameConstraint, DigestConstraint
 
 
 class PrintJob(Base):
@@ -43,18 +47,16 @@ class PrintJob(Base):
         Integer,
         primary_key=True)
 
-    # User (id and object) that did the submission.
-    user_id = Column(
+    # Participation (id and object) that did the submission.
+    participation_id = Column(
         Integer,
-        ForeignKey(User.id,
+        ForeignKey(Participation.id,
                    onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
         index=True)
-    user = relationship(
-        User,
-        backref=backref("printjobs",
-                        cascade="all, delete-orphan",
-                        passive_deletes=True))
+    participation = relationship(
+        Participation,
+        back_populates="printjobs")
 
     # Submission time of the print job.
     timestamp = Column(
@@ -64,9 +66,11 @@ class PrintJob(Base):
     # Filename and digest of the submitted file.
     filename = Column(
         Unicode,
+        FilenameConstraint("filename"),
         nullable=False)
     digest = Column(
         String,
+        DigestConstraint("digest"),
         nullable=False)
 
     done = Column(
@@ -75,5 +79,6 @@ class PrintJob(Base):
         default=False)
 
     status = Column(
-        Unicode,
-        nullable=True)
+        ARRAY(String),
+        nullable=False,
+        default=[])

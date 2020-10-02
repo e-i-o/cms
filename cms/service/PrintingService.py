@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
@@ -23,26 +23,30 @@
 """
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
 import cups
-import json
+import io
 import logging
 import os
 import subprocess
 import tempfile
-from tornado import template
+
+from jinja2 import PackageLoader
 from PyPDF2 import PdfFileReader, PdfFileMerger
 
-from cms import config
+from cms import config, rmtree
 from cms.db.filecacher import FileCacher
 from cms.io import Executor, QueueItem, TriggeredService, rpc_method
-from cms.io.GeventUtils import rmtree
 from cms.db import SessionGen, PrintJob
-from cms.server import format_datetime
+from cms.server.jinja2_toolbox import GLOBAL_ENVIRONMENT
 from cmscommon.commands import pretty_print_cmdline
-from cmscommon.datetime import get_timezone
+from cmscommon.datetime import get_timezone, utc
+from cmscommon.tex import escape_tex_normal, escape_tex_tt
 
 
 logger = logging.getLogger(__name__)
@@ -69,9 +73,11 @@ class PrintingExecutor(Executor):
         super(PrintingExecutor, self).__init__()
 
         self.file_cacher = file_cacher
-        template_dir = os.path.join(os.path.dirname(__file__),
-                                    "templates", "printing")
-        self.template_loader = template.Loader(template_dir, autoescape=None)
+        self.jinja2_env = GLOBAL_ENVIRONMENT.overlay(
+            loader=PackageLoader("cms.service", "templates/printing"),
+            autoescape=False)
+        self.jinja2_env.filters["escape_tex_normal"] = escape_tex_normal
+        self.jinja2_env.filters["escape_tex_tt"] = escape_tex_tt
 
     def execute(self, entry):
         """Print a print job.
@@ -91,10 +97,11 @@ class PrintingExecutor(Executor):
             if printjob is None:
                 raise ValueError("Print job %d not found in the database." %
                                  printjob_id)
-            user = printjob.user
-            contest = user.contest
+            user = printjob.participation.user
+            contest = printjob.participation.contest
             timezone = get_timezone(user, contest)
-            timestr = format_datetime(printjob.timestamp, timezone)
+            timestr = str(printjob.timestamp.replace(tzinfo=utc)
+                          .astimezone(timezone).replace(tzinfo=None))
             filename = printjob.filename
 
             # Check if it's ready to be printed.
@@ -108,7 +115,7 @@ class PrintingExecutor(Executor):
             # Take the base name just to be sure.
             relname = "source_" + os.path.basename(filename)
             source = os.path.join(directory, relname)
-            with open(source, "wb") as file_:
+            with io.open(source, "wb") as file_:
                 self.file_cacher.get_file_to_fobj(printjob.digest, file_)
 
             if filename.endswith(".pdf") and config.pdf_printing_allowed:
@@ -140,8 +147,7 @@ class PrintingExecutor(Executor):
                 if not os.path.exists(source_ps):
                     logger.warning("Unable to convert from text to ps.")
                     printjob.done = True
-                    printjob.status = json.dumps([
-                        N_("Invalid file")])
+                    printjob.status = [N_("Invalid file")]
                     session.commit()
                     rmtree(directory)
                     return
@@ -158,7 +164,7 @@ class PrintingExecutor(Executor):
                         "(error %d)" % (pretty_print_cmdline(cmd), ret))
 
             # Find out number of pages
-            with open(source_pdf, "rb") as file_:
+            with io.open(source_pdf, "rb") as file_:
                 pdfreader = PdfFileReader(file_)
                 page_count = pdfreader.getNumPages()
 
@@ -168,8 +174,7 @@ class PrintingExecutor(Executor):
             if page_count > config.max_pages_per_job:
                 logger.info("Too many pages.")
                 printjob.done = True
-                printjob.status = json.dumps([
-                    N_("Print job has too many pages")])
+                printjob.status = [N_("Print job has too many pages")]
                 session.commit()
                 rmtree(directory)
                 return
@@ -177,12 +182,12 @@ class PrintingExecutor(Executor):
             # Add the title page
             title_tex = os.path.join(directory, "title_page.tex")
             title_pdf = os.path.join(directory, "title_page.pdf")
-            with open(title_tex, "w") as f:
-                f.write(self.template_loader.load("title_page.tex")
-                        .generate(user=user, filename=filename,
-                                  timestr=timestr,
-                                  page_count=page_count,
-                                  paper_size=config.paper_size))
+            with io.open(title_tex, "wb") as f:
+                f.write(self.jinja2_env.get_template("title_page.tex")
+                        .render(user=user, filename=filename,
+                                timestr=timestr,
+                                page_count=page_count,
+                                paper_size=config.paper_size))
             cmd = ["pdflatex",
                    "-interaction",
                    "nonstopmode",
@@ -194,12 +199,12 @@ class PrintingExecutor(Executor):
                     "(error %d)" % (pretty_print_cmdline(cmd), ret))
 
             pdfmerger = PdfFileMerger()
-            with open(title_pdf, "rb") as file_:
+            with io.open(title_pdf, "rb") as file_:
                 pdfmerger.append(file_)
-            with open(source_pdf, "rb") as file_:
+            with io.open(source_pdf, "rb") as file_:
                 pdfmerger.append(file_)
             result = os.path.join(directory, "document.pdf")
-            with open(result, "wb") as file_:
+            with io.open(result, "wb") as file_:
                 pdfmerger.write(file_)
 
             try:
@@ -211,7 +216,7 @@ class PrintingExecutor(Executor):
                 logger.error("Unable to print: `%s'.", error)
             else:
                 printjob.done = True
-                printjob.status = json.dumps([N_("Sent to printer")])
+                printjob.status = [N_("Sent to printer")]
                 session.commit()
             finally:
                 rmtree(directory)
@@ -231,14 +236,12 @@ class PrintingService(TriggeredService):
         self.file_cacher = FileCacher(self)
 
         self.add_executor(PrintingExecutor(self.file_cacher))
+        self.start_sweeper(61.0)
 
         if config.printer is None:
             logger.info("Printing is disabled, so the PrintingService is "
                         "idle.")
             return
-
-    def _sweeper_timeout(self):
-        return 61.0
 
     def _missing_operations(self):
         """Enqueue unprinted print jobs.
@@ -251,7 +254,7 @@ class PrintingService(TriggeredService):
         counter = 0
         with SessionGen() as session:
             for printjob in session.query(PrintJob) \
-                    .filter(PrintJob.done == False).all():  # noqa
+                    .filter(PrintJob.done.is_(False)).all():
                 self.enqueue(PrintingOperation(printjob.id),
                              timestamp=printjob.timestamp)
                 counter += 1

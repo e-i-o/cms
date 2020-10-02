@@ -1,9 +1,9 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2013 Stefano Maggiolo <s.maggiolo@gmail.com>
-# Copyright © 2014 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2014-2018 Luca Wehrstedt <luca.wehrstedt@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -23,46 +23,30 @@
 """
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
-from sqlalchemy.types import TypeDecorator, Unicode
+import psycopg2.extras
+import sqlalchemy
+from sqlalchemy.dialects.postgresql import ARRAY
 
 
-class RepeatedUnicode(TypeDecorator):
-    """Implement (short) lists of unicode strings.
+# Have psycopg2 use the Python types in ipaddress to represent the INET
+# and CIDR data types of PostgreSQL.
+psycopg2.extras.register_ipaddress()
 
-    All values need to contain some non-whitespace characters and no
-    comma. Leading and trailing whitespace will be stripped.
 
-    """
-    impl = Unicode
-
-    def process_bind_param(self, value, unused_dialect):
-        """Encode value in a single unicode.
-
-        value ([unicode]): the list to encode.
-
-        return (unicode): the unicode string encoding value.
-
-        raise (ValueError): if some string contains "," or is composed
-            only by whitespace.
-
-        """
-        # This limitation may be removed if necessary.
-        if any("," in val for val in value):
-            raise ValueError("Comma cannot be encoded.")
-        if any(len(val) == 0 or val.isspace() for val in value):
-            raise ValueError("Cannot be only whitespace.")
-        return ",".join(val.strip() for val in value)
-
-    def process_result_value(self, value, unused_dialect):
-        """Decode values from a single unicode.
-
-        value (unicode): the unicode string to decode.
-
-        return ([unicode]): the decoded list.
-
-        """
-        return list(val.strip() for val in value.split(",")
-                    if len(val) > 0 and not val.isspace())
+# Taken from:
+# http://docs.sqlalchemy.org/en/rel_1_0/dialects/postgresql.html#using-json-jsonb-with-array
+# Some specialized types (like CIDR) have a natural textual
+# representation and PostgreSQL automatically converts them to and from
+# it. However that conversion isn't automatic when these types are
+# wrapped inside an ARRAY (e.g., TEXT[] can't be automatically cast to
+# CIDR[]). This subclass of ARRAY performs such casting explicitly for
+# each entry.
+class CastingArray(ARRAY):
+    def bind_expression(self, bindvalue):
+        return sqlalchemy.cast(bindvalue, self)

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
@@ -18,14 +18,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
-
-import six
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
 
 from cmsranking.Entity import Entity, InvalidData
-from cmsranking.Store import Store
-from cmsranking.User import store as user_store
 
 
 class Team(Entity):
@@ -52,7 +51,7 @@ class Team(Entity):
         try:
             assert isinstance(data, dict), \
                 "Not a dictionary"
-            assert isinstance(data['name'], six.text_type), \
+            assert isinstance(data['name'], str), \
                 "Field 'name' isn't a string"
         except KeyError as exc:
             raise InvalidData("Field %s is missing" % exc.message)
@@ -67,6 +66,3 @@ class Team(Entity):
         result = self.__dict__.copy()
         del result['key']
         return result
-
-
-store = Store(Team, 'teams', [user_store])

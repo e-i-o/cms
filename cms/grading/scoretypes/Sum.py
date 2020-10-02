@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
@@ -20,10 +20,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
-
-import json
+from future.builtins.disabled import *  # noqa
+from future.builtins import *  # noqa
+from six import iterkeys, itervalues
 
 from cms.grading.ScoreType import ScoreTypeAlone
 
@@ -39,21 +41,31 @@ class Sum(ScoreTypeAlone):
 
     """
     # Mark strings for localization.
+    N_("#")
     N_("Outcome")
     N_("Details")
     N_("Execution time")
     N_("Memory used")
     N_("N/A")
     TEMPLATE = """\
-{% from cms.grading import format_status_text %}
-{% from cms.server import format_size %}
 <table class="testcase-list">
     <thead>
         <tr>
-            <th>{{ _("Outcome") }}</th>
-            <th>{{ _("Details") }}</th>
-            <th>{{ _("Execution time") }}</th>
-            <th>{{ _("Memory used") }}</th>
+            <th class="idx">
+                {% trans %}#{% endtrans %}
+            </th>
+            <th class="outcome">
+                {% trans %}Outcome{% endtrans %}
+            </th>
+            <th class="details">
+                {% trans %}Details{% endtrans %}
+            </th>
+            <th class="execution-time">
+                {% trans %}Execution time{% endtrans %}
+            </th>
+            <th class="memory-used">
+                {% trans %}Memory used{% endtrans %}
+            </th>
         </tr>
     </thead>
     <tbody>
@@ -65,60 +77,53 @@ class Sum(ScoreTypeAlone):
         <tr class="notcorrect">
             {% else %}
         <tr class="partiallycorrect">
-            {% end %}
-            <td>{{ _(tc["outcome"]) }}</td>
-            <td>{{ format_status_text(tc["text"], _) }}</td>
-            <td>
-            {% if tc["time"] is not None %}
-                {{ _("%(seconds)0.3f s") % {'seconds': tc["time"]} }}
+            {% endif %}
+            <td class="idx">{{ loop.index }}</td>
+            <td class="outcome">{{ _(tc["outcome"]) }}</td>
+            <td class="details">{{ tc["text"]|format_status_text }}</td>
+            <td class="execution-time">
+            {% if tc["time"] is not none %}
+                {{ tc["time"]|format_duration }}
             {% else %}
-                {{ _("N/A") }}
-            {% end %}
+                {% trans %}N/A{% endtrans %}
+            {% endif %}
             </td>
-            <td>
-            {% if tc["memory"] is not None %}
-                {{ format_size(tc["memory"]) }}
+            <td class="memory-used">
+            {% if tc["memory"] is not none %}
+                {{ tc["memory"]|format_size }}
             {% else %}
-                {{ _("N/A") }}
-            {% end %}
+                {% trans %}N/A{% endtrans %}
+            {% endif %}
             </td>
         {% else %}
         <tr class="undefined">
-            <td colspan="4">
-                {{ _("N/A") }}
+            <td colspan="5">
+                {% trans %}N/A{% endtrans %}
             </td>
         </tr>
-        {% end %}
-    {% end %}
+        {% endif %}
+    {% endfor %}
     </tbody>
 </table>"""
 
     def max_scores(self):
-        """Compute the maximum score of a submission.
-
-        returns (float, float): maximum score overall and public.
-
-        """
+        """See ScoreType.max_score."""
         public_score = 0.0
         score = 0.0
-        for public in self.public_testcases.itervalues():
+        for public in itervalues(self.public_testcases):
             if public:
                 public_score += self.parameters
             score += self.parameters
         return score, public_score, []
 
     def compute_score(self, submission_result):
-        """Compute the score of a submission.
-
-        See the same method in ScoreType for details.
-
-        """
+        """See ScoreType.compute_score."""
         # Actually, this means it didn't even compile!
         if not submission_result.evaluated():
-            return 0.0, "[]", 0.0, "[]", json.dumps([])
+            return 0.0, [], 0.0, [], []
 
         # XXX Lexicographical order by codename
-        indices = sorted(self.public_testcases.keys())
+        indices = sorted(iterkeys(self.public_testcases))
         evaluations = dict((ev.codename, ev)
                            for ev in submission_result.evaluations)
         testcases = []
@@ -143,9 +148,7 @@ class Sum(ScoreTypeAlone):
             else:
                 public_testcases.append({"idx": idx})
 
-        return score, json.dumps(testcases), \
-            public_score, json.dumps(public_testcases), \
-            json.dumps([])
+        return score, testcases, public_score, public_testcases, []
 
     def get_public_outcome(self, outcome):
         """Return a public outcome from an outcome.
