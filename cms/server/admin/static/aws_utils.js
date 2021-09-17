@@ -27,10 +27,15 @@
 
 var CMS = CMS || {};
 
-CMS.AWSUtils = function(url_root, timestamp,
-                        contest_start, contest_stop,
-                        analysis_start, analysis_stop,
-                        phase) {
+CMS.AWSUtils = function (
+    url_root,
+    timestamp,
+    contest_start,
+    contest_stop,
+    analysis_start,
+    analysis_stop,
+    phase
+) {
     this.url = CMS.AWSUtils.create_url_builder(url_root);
     this.first_date = new Date();
     this.last_notification = timestamp;
@@ -49,9 +54,8 @@ CMS.AWSUtils = function(url_root, timestamp,
     }
 };
 
-
-CMS.AWSUtils.create_url_builder = function(url_root) {
-    return function() {
+CMS.AWSUtils.create_url_builder = function (url_root) {
+    return function () {
         var url = url_root;
         for (var i = 0; i < arguments.length; ++i) {
             if (url.substr(-1) != "/") {
@@ -63,12 +67,11 @@ CMS.AWSUtils.create_url_builder = function(url_root) {
     };
 };
 
-
 /**
  * Displays a subpage over the current page with the specified
  * content.
  */
-CMS.AWSUtils.prototype.display_subpage = function(elements) {
+CMS.AWSUtils.prototype.display_subpage = function (elements) {
     // TODO: update jQuery to allow appending of arrays of elements.
     for (var i = 0; i < elements.length; ++i) {
         elements[i].appendTo($("#subpage_content"));
@@ -76,15 +79,13 @@ CMS.AWSUtils.prototype.display_subpage = function(elements) {
     $("#subpage").show();
 };
 
-
 /**
  * Hides a subpage previously displayed.
  */
-CMS.AWSUtils.prototype.hide_subpage = function() {
+CMS.AWSUtils.prototype.hide_subpage = function () {
     $("#subpage").hide();
     $("#subpage_content").empty();
 };
-
 
 /**
  * This is called when we receive file content, or an error message.
@@ -95,7 +96,7 @@ CMS.AWSUtils.prototype.hide_subpage = function() {
  * error (string): The error message, or null if the request is
  *     successful.
  */
-CMS.AWSUtils.prototype.file_received = function(response, error) {
+CMS.AWSUtils.prototype.file_received = function (response, error) {
     var file_name = this.file_asked_name;
     var url = this.file_asked_url;
     var elements = [];
@@ -103,8 +104,8 @@ CMS.AWSUtils.prototype.file_received = function(response, error) {
         alert("File request failed.");
     } else {
         if (response.length > 100000) {
-            elements.push($('<h1>').text(file_name));
-            elements.push($('<a>').text("Download").prop("href", url));
+            elements.push($("<h1>").text(file_name));
+            elements.push($("<a>").text("Download").prop("href", url));
             this.display_subpage(elements);
             return;
         }
@@ -115,42 +116,43 @@ CMS.AWSUtils.prototype.file_received = function(response, error) {
         } else if (file_name.match(/.pas$/i)) {
             pre_class = "brush: delphi";
         }
-        elements.push($('<h1>').text(file_name));
-        elements.push($('<a>').text("Download").prop("href", url));
-        elements.push($('<pre>').text(response).prop("id", "source_container")
-                      .prop("class", pre_class));
+        elements.push($("<h1>").text(file_name));
+        elements.push($("<a>").text("Download").prop("href", url));
+        elements.push(
+            $("<pre>")
+                .text(response)
+                .prop("id", "source_container")
+                .prop("class", pre_class)
+        );
 
         this.display_subpage(elements);
         SyntaxHighlighter.highlight();
     }
 };
 
-
 /**
  * Displays a subpage with the content of the file at the specified
  * url.
  */
-CMS.AWSUtils.prototype.show_file = function(file_name, url) {
+CMS.AWSUtils.prototype.show_file = function (file_name, url) {
     this.file_asked_name = file_name;
     this.file_asked_url = url;
     var file_received = this.bind_func(this, this.file_received);
     this.ajax_request(url, null, file_received);
 };
 
-
 /**
  * To be added to the onclick of an element named title_XXX. Hide/show
  * an element named XXX, and change the class of title_XXX between
  * toggling_on and toggling_off.
  */
-CMS.AWSUtils.prototype.toggle_visibility = function() {
+CMS.AWSUtils.prototype.toggle_visibility = function () {
     var title = $(this);
     var item = $(this.id.replace("title_", "#").replace(".", "\\."));
-    item.slideToggle("normal", function() {
+    item.slideToggle("normal", function () {
         title.toggleClass("toggling_on toggling_off");
     });
 };
-
 
 /**
  * Display the notification to the user.
@@ -161,14 +163,18 @@ CMS.AWSUtils.prototype.toggle_visibility = function() {
  * subject (string): subject.
  * text (string): body of notification.
  */
-CMS.AWSUtils.prototype.display_notification = function(type, timestamp,
-                                                       subject, text,
-                                                       contest_id) {
+CMS.AWSUtils.prototype.display_notification = function (
+    type,
+    timestamp,
+    subject,
+    text,
+    contest_id
+) {
     if (this.last_notification < timestamp) {
         this.last_notification = timestamp;
     }
     var timestamp_int = parseInt(timestamp);
-    var subject_string = $('<span>');
+    var subject_string = $("<span>");
     if (type == "message") {
         subject_string = $("<span>").text("Private message. ");
     } else if (type == "announcement") {
@@ -176,7 +182,8 @@ CMS.AWSUtils.prototype.display_notification = function(type, timestamp,
     } else if (type == "question") {
         subject_string = $("<span>").text("Reply to your question. ");
     } else if (type == "new_question") {
-        subject_string = $("<a>").text("New question: ")
+        subject_string = $("<a>")
+            .text("New question: ")
             .prop("href", this.url("contest", contest_id, "questions"));
     }
 
@@ -184,20 +191,29 @@ CMS.AWSUtils.prototype.display_notification = function(type, timestamp,
     var outer = $("#notifications");
     var timestamp_div = $("<div>")
         .addClass("notification_timestamp")
-        .text(timestamp_int != 0 ? this.format_time_or_date(timestamp_int) : "");
+        .text(
+            timestamp_int != 0 ? this.format_time_or_date(timestamp_int) : ""
+        );
     var subject_div = $("<div>")
         .addClass("notification_subject")
         .append(subject_string);
-    var close_div = $('<div>').html("&times;").addClass("notification_close")
-        .click(function() { self.close_notification(this); });
-    var inner =
-        $('<div>').addClass("notification").addClass("notification_type_" + type)
-            .append(close_div)
-            .append($('<div>').addClass("notification_msg")
-                    .append(timestamp_div)
-                    .append(subject_div.append($("<span>").text(subject)))
-                    .append($("<div>").addClass("notification_text").text(text))
-                   );
+    var close_div = $("<div>")
+        .html("&times;")
+        .addClass("notification_close")
+        .click(function () {
+            self.close_notification(this);
+        });
+    var inner = $("<div>")
+        .addClass("notification")
+        .addClass("notification_type_" + type)
+        .append(close_div)
+        .append(
+            $("<div>")
+                .addClass("notification_msg")
+                .append(timestamp_div)
+                .append(subject_div.append($("<span>").text(subject)))
+                .append($("<div>").addClass("notification_text").text(text))
+        );
     outer.append(inner);
 
     // Trigger a desktop notification as well (but only if it's needed)
@@ -206,28 +222,33 @@ CMS.AWSUtils.prototype.display_notification = function(type, timestamp,
     }
 };
 
-
-CMS.AWSUtils.prototype.desktop_notification = function(type, timestamp,
-                                                       subject, text) {
+CMS.AWSUtils.prototype.desktop_notification = function (
+    type,
+    timestamp,
+    subject,
+    text
+) {
     // Check desktop notifications support
     if (!("Notification" in window)) {
         return;
     }
 
     // Ask again, if it was not explicitly denied
-    if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+    if (
+        Notification.permission !== "granted" &&
+        Notification.permission !== "denied"
+    ) {
         Notification.requestPermission();
     }
 
     // Create notification
     if (Notification.permission === "granted") {
         new Notification(subject, {
-            "body": text,
-            "icon": this.url("static", "favicon.ico")
+            body: text,
+            icon: this.url("static", "favicon.ico"),
         });
     }
 };
-
 
 /**
  * Update the number of unread private and public messages in the span
@@ -236,7 +257,10 @@ CMS.AWSUtils.prototype.desktop_notification = function(type, timestamp,
  * delta_public (int): how many public unreads to add.
  * delta_private (int): how many public unreads to add.
  */
-CMS.AWSUtils.prototype.update_unread_counts = function(delta_public, delta_private) {
+CMS.AWSUtils.prototype.update_unread_counts = function (
+    delta_public,
+    delta_private
+) {
     var unread_public = $("#unread_public");
     var unread_private = $("#unread_private");
     if (unread_public) {
@@ -261,18 +285,17 @@ CMS.AWSUtils.prototype.update_unread_counts = function(delta_public, delta_priva
     }
 };
 
-
 /**
  * Ask CWS (via ajax, not rpc) to send to the user the new
  * notifications.
  */
-CMS.AWSUtils.prototype.update_notifications = function() {
+CMS.AWSUtils.prototype.update_notifications = function () {
     var display_notification = this.bind_func(this, this.display_notification);
     var update_unread_counts = this.bind_func(this, this.update_unread_counts);
     this.ajax_request(
         this.url("notifications"),
         "last_notification=" + this.last_notification,
-        function(response, error) {
+        function (response, error) {
             if (error == null) {
                 response = JSON.parse(response);
                 var msgs_public = 0;
@@ -283,67 +306,72 @@ CMS.AWSUtils.prototype.update_notifications = function() {
                         response[i].timestamp,
                         response[i].subject,
                         response[i].text,
-                        response[i].contest_id);
+                        response[i].contest_id
+                    );
                     if (response[i].type == "announcement") {
                         msgs_public++;
-                    } else if (response[i].type == "question"
-                               || response[i].type == "message") {
+                    } else if (
+                        response[i].type == "question" ||
+                        response[i].type == "message"
+                    ) {
                         msgs_private++;
                     }
                 }
                 update_unread_counts(msgs_public, msgs_private);
             }
-        });
+        }
+    );
 };
-
 
 /**
  * For the close button of a notification.
  */
-CMS.AWSUtils.prototype.close_notification = function(item) {
+CMS.AWSUtils.prototype.close_notification = function (item) {
     var bubble = item.parentNode;
     if (bubble.className.indexOf("notification_type_announcement") != -1) {
         this.update_unread_counts(-1, 0);
-    } else if (bubble.className.indexOf("notification_type_question") != -1
-               || bubble.className.indexOf("notification_type_message") != -1) {
+    } else if (
+        bubble.className.indexOf("notification_type_question") != -1 ||
+        bubble.className.indexOf("notification_type_message") != -1
+    ) {
         this.update_unread_counts(0, -1);
     }
     bubble.parentNode.removeChild(item.parentNode);
 };
 
-
 /**
  * Provides table row comparator for specified column and order.
  */
 function get_table_row_comparator(column_idx, numeric, ascending) {
-    return function(a, b) {
+    return function (a, b) {
         var valA = $(a).children("td").eq(column_idx).text();
         var valB = $(b).children("td").eq(column_idx).text();
-        var result = numeric ? valA - valB : valA.localeCompare(valB);
-        return ascending ? result : -result;
-    }
+        var result = numeric
+            ? Number(valA) - Number(valB)
+            : valA.localeCompare(valB);
+        return ascending ? -result : result;
+    };
 }
-
 
 /**
  * Sorts specified table by specified column in specified order.
  */
-CMS.AWSUtils.sort_table = function(table, column_idx, ascending) {
+CMS.AWSUtils.sort_table = function (table, column_idx, ascending) {
     var initial_column_idx = table.data("initial_sort_column_idx");
     var ranks_column = table.data("ranks_column");
     column_idx += ranks_column ? 1 : 0;
-    var table_rows = table
-        .children("tbody")
-        .children("tr");
+    var table_rows = table.children("tbody").children("tr");
     var column_header = table
         .children("thead")
         .children("tr")
         .children("th")
         .eq(column_idx);
-    var numeric = column_header.is("[numeric]");
+    var settings = (column_header.attr("data-sort-settings") || "").split(" ");
 
-    // If specified, column order is reversed (eg to feel more natural)
-    if (column_header.is("[reversed]")) {
+    var numeric = settings.indexOf("numeric") >= 0;
+
+    // If specified, flip column's natural order, e.g. due to meaning of values.
+    if (settings.indexOf("reversed") >= 0) {
         ascending = !ascending;
     }
 
@@ -352,37 +380,38 @@ CMS.AWSUtils.sort_table = function(table, column_idx, ascending) {
 
     // Reassign arrows to headers
     table.find(".column-sort").html("&varr;");
-    column_header.find(".column-sort").html(ascending ? "&darr;" : "&uarr;");
+    column_header.find(".column-sort").html(ascending ? "&uarr;" : "&darr;");
 
     // Do the sorting, by initial column and then by selected column.
     table_rows
         .sort(get_table_row_comparator(initial_column_idx, numeric, ascending))
         .sort(get_table_row_comparator(column_idx, numeric, ascending))
-        .each(function(idx, row) {
-            table.children("tbody").append(row)
+        .each(function (idx, row) {
+            table.children("tbody").append(row);
         });
 
     if (ranks_column) {
-        table_rows.each(function(idx, row) {
-            $(row).children("td").first().text(idx + 1)
+        table_rows.each(function (idx, row) {
+            $(row)
+                .children("td")
+                .first()
+                .text(idx + 1);
         });
     }
 };
 
-
 /**
  * Makes table sortable, adding ranks column and sorting buttons in header.
  */
-CMS.AWSUtils.init_table_sort = function(table, ranks_column,
-                                        initial_column_idx,
-                                        initial_ascending) {
+CMS.AWSUtils.init_table_sort = function (
+    table,
+    ranks_column,
+    initial_column_idx,
+    initial_ascending
+) {
     table.addClass("sortable");
-    var table_column_headers = table
-        .children("thead")
-        .children("tr");
-    var table_rows = table
-        .children("tbody")
-        .children("tr");
+    var table_column_headers = table.children("thead").children("tr");
+    var table_rows = table.children("tbody").children("tr");
 
     // Normalize column index, converting negative to positive from the end.
     initial_column_idx = table_column_headers
@@ -398,19 +427,17 @@ CMS.AWSUtils.init_table_sort = function(table, ranks_column,
     var ascending = initial_ascending;
 
     // Add sorting indicators to column headers
-    table_column_headers
-        .children("th")
-        .each(function(column_idx, header) {
-            $("<a/>", {
-                href: "#",
-                class: "column-sort",
-                click: function() {
-                    ascending = !ascending && previous_column_idx == column_idx;
-                    previous_column_idx = column_idx;
-                    CMS.AWSUtils.sort_table(table, column_idx, ascending);
-                }
-            }).appendTo(header);
-        });
+    table_column_headers.children("th").each(function (column_idx, header) {
+        $("<a/>", {
+            href: "#",
+            class: "column-sort",
+            click: function () {
+                ascending = !ascending && previous_column_idx == column_idx;
+                previous_column_idx = column_idx;
+                CMS.AWSUtils.sort_table(table, column_idx, ascending);
+            },
+        }).appendTo(header);
+    });
 
     // Add ranks column
     if (ranks_column) {
@@ -422,7 +449,6 @@ CMS.AWSUtils.init_table_sort = function(table, ranks_column,
     CMS.AWSUtils.sort_table(table, initial_column_idx, initial_ascending);
 };
 
-
 /**
  * Return a string representation of the number with two digits.
  *
@@ -430,7 +456,7 @@ CMS.AWSUtils.init_table_sort = function(table, ranks_column,
  * return (string): n as a string with two digits, maybe with a
  *     leading 0.
  */
-CMS.AWSUtils.prototype.two_digits = function(n) {
+CMS.AWSUtils.prototype.two_digits = function (n) {
     if (n < 10) {
         return "0" + n;
     } else {
@@ -438,27 +464,26 @@ CMS.AWSUtils.prototype.two_digits = function(n) {
     }
 };
 
-
 /**
  * Update the remaining time showed in the "remaining" div.
  */
-CMS.AWSUtils.prototype.update_remaining_time = function() {
+CMS.AWSUtils.prototype.update_remaining_time = function () {
     // We assume this.phase always is the correct phase (since this
     // method also refreshes the page when the phase changes).
     var relevant_timestamp = null;
     var text = null;
     if (this.phase === -1) {
         relevant_timestamp = this.contest_start;
-        text = "To start of contest: "
+        text = "To start of contest: ";
     } else if (this.phase === 0) {
         relevant_timestamp = this.contest_stop;
-        text = "To end of contest: "
+        text = "To end of contest: ";
     } else if (this.phase === 1) {
         relevant_timestamp = this.analysis_start;
-        text = "To start of analysis: "
+        text = "To start of analysis: ";
     } else if (this.phase === 2) {
         relevant_timestamp = this.analysis_stop;
-        text = "To end of analysis: "
+        text = "To end of analysis: ";
     }
 
     // We are in phase 3, nothing to show.
@@ -480,7 +505,6 @@ CMS.AWSUtils.prototype.update_remaining_time = function() {
     $("#remaining_value").text(this.format_countdown(countdown_sec));
 };
 
-
 /**
  * Check the status returned by an RPC call and display the error if
  * necessary, otherwise redirect to another page.
@@ -488,15 +512,14 @@ CMS.AWSUtils.prototype.update_remaining_time = function() {
  * url (string): the destination page if response is ok.
  * response (dict): the response returned by the RPC.
  */
-CMS.AWSUtils.prototype.redirect_if_ok = function(url, response) {
+CMS.AWSUtils.prototype.redirect_if_ok = function (url, response) {
     var msg = this.standard_response(response);
     if (msg != "") {
-        alert('Unable to invalidate (' + msg + ').');
+        alert("Unable to invalidate (" + msg + ").");
     } else {
         location.href = url;
     }
 };
-
 
 /**
  * Represent in a nice looking way a couple (job_type, submission_id)
@@ -505,46 +528,64 @@ CMS.AWSUtils.prototype.redirect_if_ok = function(url, response) {
  * job (array): a tuple (job_type, submission_id, dataset_id)
  * returns (string): nice representation of job
  */
-CMS.AWSUtils.prototype.repr_job = function(job) {
+CMS.AWSUtils.prototype.repr_job = function (job) {
     var job_type = "???";
     var object_type = "???";
     if (job == null) {
         return "N/A";
     } else if (job == "disabled") {
         return "Worker disabled";
-    } else if (job["type"] == 'compile') {
-        job_type = 'Compiling';
-        object_type = 'submission';
-    } else if (job["type"] == 'evaluate') {
-        job_type = 'Evaluating';
-        object_type = 'submission';
-    } else if (job["type"] == 'compile_test') {
-        job_type = 'Compiling';
-        object_type = 'user_test';
-    } else if (job["type"] == 'evaluate_test') {
-        job_type = 'Evaluating';
-        object_type = 'user_test';
+    } else if (job["type"] == "compile") {
+        job_type = "Compiling";
+        object_type = "submission";
+    } else if (job["type"] == "evaluate") {
+        job_type = "Evaluating";
+        object_type = "submission";
+    } else if (job["type"] == "compile_test") {
+        job_type = "Compiling";
+        object_type = "user_test";
+    } else if (job["type"] == "evaluate_test") {
+        job_type = "Evaluating";
+        object_type = "user_test";
     }
 
-    if (object_type == 'submission') {
-        return job_type
-            + ' the <a href="' + this.url("submission", job["object_id"], job["dataset_id"]) + '">result</a>'
-            + ' of <a href="' + this.url("submission", job["object_id"]) + '">submission ' + job["object_id"] + '</a>'
-            + ' on <a href="' + this.url("dataset", job["dataset_id"]) + '">dataset ' + job["dataset_id"] + '</a>'
-            + (job["multiplicity"]
-               ? " [" + job["multiplicity"] + " time(s) in queue]"
-               : "")
-            + (job["testcase_codename"]
-               ? " [testcase: `" + job["testcase_codename"] + "']"
-               : "");
+    if (object_type == "submission") {
+        return (
+            job_type +
+            ' the <a href="' +
+            this.url("submission", job["object_id"], job["dataset_id"]) +
+            '">result</a>' +
+            ' of <a href="' +
+            this.url("submission", job["object_id"]) +
+            '">submission ' +
+            job["object_id"] +
+            "</a>" +
+            ' on <a href="' +
+            this.url("dataset", job["dataset_id"]) +
+            '">dataset ' +
+            job["dataset_id"] +
+            "</a>" +
+            (job["multiplicity"]
+                ? " [" + job["multiplicity"] + " time(s) in queue]"
+                : "") +
+            (job["testcase_codename"]
+                ? " [testcase: `" + job["testcase_codename"] + "']"
+                : "")
+        );
     } else {
-        return job_type
-            + ' the result'
-            + ' of user_test ' + job["object_id"]
-            + ' on <a href="' + this.url("dataset", job["dataset_id"]) + '">dataset ' + job["dataset_id"] + '</a>';
+        return (
+            job_type +
+            " the result" +
+            " of user_test " +
+            job["object_id"] +
+            ' on <a href="' +
+            this.url("dataset", job["dataset_id"]) +
+            '">dataset ' +
+            job["dataset_id"] +
+            "</a>"
+        );
     }
 };
-
 
 /**
  * Format time as hours, minutes and seconds ago.
@@ -553,11 +594,11 @@ CMS.AWSUtils.prototype.repr_job = function(job) {
  * returns (string): representation of time as "[[H hour(s), ]M
  *     minute(s), ]S second(s)".
  */
-CMS.AWSUtils.prototype.repr_time_ago = function(time) {
+CMS.AWSUtils.prototype.repr_time_ago = function (time) {
     if (time == null) {
         return "N/A";
     }
-    var diff = parseInt((new Date()).getTime() / 1000 - time);
+    var diff = parseInt(new Date().getTime() / 1000 - time);
     var res = "";
 
     var s = diff % 60;
@@ -581,18 +622,17 @@ CMS.AWSUtils.prototype.repr_time_ago = function(time) {
     return res;
 };
 
-
 /**
  * Format time as hours, minutes and seconds ago.
  *
  * time (int): a unix time.
  * returns (string): representation of time as "[[HH:]MM:]SS]".
  */
-CMS.AWSUtils.prototype.repr_time_ago_short = function(time) {
+CMS.AWSUtils.prototype.repr_time_ago_short = function (time) {
     if (time == null) {
         return "N/A";
     }
-    var diff = parseInt((new Date()).getTime() / 1000 - time);
+    var diff = parseInt(new Date().getTime() / 1000 - time);
     var res = "";
 
     var s = diff % 60;
@@ -618,14 +658,13 @@ CMS.AWSUtils.prototype.repr_time_ago_short = function(time) {
     return res;
 };
 
-
 /**
  * Return timestamp formatted as HH:MM:SS.
  *
  * timestamp (int): unix time.
  * return (string): timestamp formatted as above.
  */
-CMS.AWSUtils.prototype.format_time = function(timestamp) {
+CMS.AWSUtils.prototype.format_time = function (timestamp) {
     var date = new Date(timestamp * 1000);
     var hours = this.two_digits(date.getHours());
     var minutes = this.two_digits(date.getMinutes());
@@ -633,25 +672,27 @@ CMS.AWSUtils.prototype.format_time = function(timestamp) {
     return hours + ":" + minutes + ":" + seconds;
 };
 
-
 /**
  * Return the time difference formatted as HHHH:MM:SS.
  *
  * timestamp (int): a time delta in s.
  * return (string): timestamp formatted as above.
  */
-CMS.AWSUtils.prototype.format_countdown = function(countdown) {
+CMS.AWSUtils.prototype.format_countdown = function (countdown) {
     var hours = countdown / 60 / 60;
     var hours_rounded = Math.floor(hours);
-    var minutes = countdown / 60 - (60 * hours_rounded);
+    var minutes = countdown / 60 - 60 * hours_rounded;
     var minutes_rounded = Math.floor(minutes);
-    var seconds = countdown - (60 * 60 * hours_rounded)
-        - (60 * minutes_rounded);
+    var seconds = countdown - 60 * 60 * hours_rounded - 60 * minutes_rounded;
     var seconds_rounded = Math.floor(seconds);
-    return hours_rounded + ":" + this.two_digits(minutes_rounded) + ":"
-        + this.two_digits(seconds_rounded);
+    return (
+        hours_rounded +
+        ":" +
+        this.two_digits(minutes_rounded) +
+        ":" +
+        this.two_digits(seconds_rounded)
+    );
 };
-
 
 /**
  * Return timestamp formatted as HH:MM:SS, dd/mm/yyyy.
@@ -659,7 +700,7 @@ CMS.AWSUtils.prototype.format_countdown = function(countdown) {
  * timestamp (int): unix time.
  * return (string): timestamp formatted as above.
  */
-CMS.AWSUtils.prototype.format_datetime = function(timestamp) {
+CMS.AWSUtils.prototype.format_datetime = function (timestamp) {
     var time = this.format_time(timestamp);
     var date = new Date(timestamp * 1000);
     var days = this.two_digits(date.getDate());
@@ -668,7 +709,6 @@ CMS.AWSUtils.prototype.format_datetime = function(timestamp) {
     return time + ", " + days + "/" + months + "/" + years;
 };
 
-
 /**
  * Return timestamp formatted as HH:MM:SS if the date is the same date
  * as today, as a complete date + time if the date is different.
@@ -676,8 +716,8 @@ CMS.AWSUtils.prototype.format_datetime = function(timestamp) {
  * timestamp (int): unix time.
  * return (string): timestamp formatted as above.
  */
-CMS.AWSUtils.prototype.format_time_or_date = function(timestamp) {
-    var today = (new Date()).toDateString();
+CMS.AWSUtils.prototype.format_time_or_date = function (timestamp) {
+    var today = new Date().toDateString();
     var date = new Date(timestamp * 1000);
     if (today == date.toDateString()) {
         return this.format_time(timestamp);
@@ -686,7 +726,6 @@ CMS.AWSUtils.prototype.format_time_or_date = function(timestamp) {
     }
 };
 
-
 /**
  * If the response is for a standard error (unconnected, ...)  then
  * return an appropriate message, otherwise return "".
@@ -694,15 +733,17 @@ CMS.AWSUtils.prototype.format_time_or_date = function(timestamp) {
  * response (object): an rpc response.
  * return (string): appropriate message or "".
  */
-CMS.AWSUtils.prototype.standard_response = function(response) {
-    if (response['status'] != 'ok') {
-        var msg = "Unexpected reply `" + response['status']
-            + "'. This should not happen.";
-        if (response['status'] == 'unconnected') {
-            msg = 'Service not connected.';
-        } else if (response['status'] == 'not authorized') {
+CMS.AWSUtils.prototype.standard_response = function (response) {
+    if (response["status"] != "ok") {
+        var msg =
+            "Unexpected reply `" +
+            response["status"] +
+            "'. This should not happen.";
+        if (response["status"] == "unconnected") {
+            msg = "Service not connected.";
+        } else if (response["status"] == "not authorized") {
             msg = "You are not authorized to call this method.";
-        } else if (response['status'] == 'fail') {
+        } else if (response["status"] == "fail") {
             msg = "Call to service failed.";
         }
         return msg;
@@ -710,16 +751,17 @@ CMS.AWSUtils.prototype.standard_response = function(response) {
     return "";
 };
 
-
-CMS.AWSUtils.prototype.show_page = function(item, page, elements_per_page) {
+CMS.AWSUtils.prototype.show_page = function (item, page, elements_per_page) {
     elements_per_page = elements_per_page || 5;
 
     var children = $("#paged_content_" + item).children();
     var npages = Math.ceil(children.length / elements_per_page);
     var final_page = Math.min(page, npages) - 1;
-    children.each(function(i, child) {
-        if (i >= elements_per_page * final_page
-            && i < elements_per_page * (final_page + 1)) {
+    children.each(function (i, child) {
+        if (
+            i >= elements_per_page * final_page &&
+            i < elements_per_page * (final_page + 1)
+        ) {
             $(child).show();
         } else {
             $(child).hide();
@@ -732,19 +774,23 @@ CMS.AWSUtils.prototype.show_page = function(item, page, elements_per_page) {
     selector.append("Pages: ");
     for (var i = 1; i <= npages; i++) {
         if (i != page) {
-            selector.append($("<a>").text(i + " ")
-                            .click(function(j) {
-                                return function() {
-                                    self.show_page(item, j, elements_per_page);
-                                    return false;
-                                };
-                            }(i)));
+            selector.append(
+                $("<a>")
+                    .text(i + " ")
+                    .click(
+                        (function (j) {
+                            return function () {
+                                self.show_page(item, j, elements_per_page);
+                                return false;
+                            };
+                        })(i)
+                    )
+            );
         } else {
             selector.append(i + " ");
         }
     }
 };
-
 
 /**
  * Returns a function binded to an object - useful in case we need to
@@ -758,12 +804,11 @@ CMS.AWSUtils.prototype.show_page = function(item, page, elements_per_page) {
  * method (function): the function to bind
  * returns (function): the binded function
  */
-CMS.AWSUtils.prototype.bind_func = function(object, method) {
-    return function() {
+CMS.AWSUtils.prototype.bind_func = function (object, method) {
+    return function () {
         return method.apply(object, arguments);
     };
 };
-
 
 /**
  * Perform an AJAX GET request.
@@ -772,30 +817,29 @@ CMS.AWSUtils.prototype.bind_func = function(object, method) {
  * args (string|null): the arguments already encoded.
  * callback (function): the function to call with the response.
  */
-CMS.AWSUtils.prototype.ajax_request = function(url, args, callback) {
+CMS.AWSUtils.prototype.ajax_request = function (url, args, callback) {
     if (args != null) {
         url = url + "?" + args;
     }
     var jqxhr = $.get(url);
-    jqxhr.done(function(data) {
+    jqxhr.done(function (data) {
         callback(data, null);
     });
-    jqxhr.fail(function() {
+    jqxhr.fail(function () {
         callback(null, jqxhr.status);
     });
 };
-
 
 /**
  * Sends a request and on success redirect to the page
  * specified in the response, if present.
  */
-CMS.AWSUtils.ajax_edit_request = function(type, url) {
+CMS.AWSUtils.ajax_edit_request = function (type, url) {
     var settings = {
-        "type": type,
-        headers: {"X-XSRFToken": get_cookie("_xsrf")}
+        type: type,
+        headers: { "X-XSRFToken": get_cookie("_xsrf") },
     };
-    settings["success"] = function(data_redirect_url) {
+    settings["success"] = function (data_redirect_url) {
         if (data_redirect_url) {
             window.location.replace(data_redirect_url);
         }
@@ -803,20 +847,18 @@ CMS.AWSUtils.ajax_edit_request = function(type, url) {
     $.ajax(url, settings);
 };
 
-
 /**
  * Sends a delete request and on success redirect to the page
  * specified in the response, if present.
  */
-CMS.AWSUtils.ajax_delete = function(url) {
+CMS.AWSUtils.ajax_delete = function (url) {
     CMS.AWSUtils.ajax_edit_request("DELETE", url);
 };
-
 
 /**
  * Sends a post request and on success. See AWSUtils.ajax_request
  * for more details.
  */
-CMS.AWSUtils.ajax_post = function(url) {
+CMS.AWSUtils.ajax_post = function (url) {
     CMS.AWSUtils.ajax_edit_request("POST", url);
 };

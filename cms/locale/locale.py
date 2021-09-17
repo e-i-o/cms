@@ -11,6 +11,7 @@
 # Copyright © 2014 Fabian Gundlach <320pointsguy@gmail.com>
 # Copyright © 2015 William Di Luigi <williamdiluigi@gmail.com>
 # Copyright © 2016 Myungwoo Chun <mc.tamaki@gmail.com>
+# Copyright © 2018 Edoardo Morassutto <edoardo.morassutto@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -55,6 +56,10 @@ from cmscommon.datetime import utc
 
 
 logger = logging.getLogger(__name__)
+
+
+def N_(msgid):
+    return msgid
 
 
 class Translation(object):
@@ -206,20 +211,18 @@ class Translation(object):
         return babel.units.format_unit(
             d, "duration-second", length=length, format=f, locale=self.locale)
 
-    PREFIX_FACTOR = 1000
-    SIZE_UNITS = ["byte", "kilobyte", "megabyte", "gigabyte", "terabyte"]
+    PREFIX_FACTOR = 1024
+    SIZE_UNITS = [None, N_("%s KiB"), N_("%s MiB"), N_("%s GiB"), N_("%s TiB")]
 
     def format_size(self, n):
         """Format the given number of bytes.
 
-        Format the size of a file, a memory allocation, etc. which is given
-        as a number of bytes. Use the most appropriate unit, from bytes up
-        to terabytes. Always use three significant digits, except when this
-        would mean:
-        - rounding the integral part (happens only for > 1000 terabytes),
-          in which case use more than three;
-        - showing sub-byte values (happens only for < 100 bytes), in which
-          case use less than three.
+        Format the size of a file, a memory allocation, etc. which is
+        given as a number of bytes. Use the most appropriate unit, from
+        bytes up to tebibytes. Always show the entire integral part plus
+        as many fractional digits as needed to reach at least three
+        significant digits in total, except when this would mean showing
+        sub-byte values (happens only for less than 100 bytes).
 
         n (int): a size, as number of bytes.
 
@@ -230,21 +233,20 @@ class Translation(object):
 
         if n < self.PREFIX_FACTOR:
             return babel.units.format_unit(
-                round(n), "digital-%s" % self.SIZE_UNITS[0], length="short",
-                locale=self.locale)
+                round(n), "digital-byte", locale=self.locale)
         for unit in self.SIZE_UNITS[1:]:
             n /= self.PREFIX_FACTOR
             if n < self.PREFIX_FACTOR:
                 f = copy.copy(self.locale.decimal_formats[None])
-                # We need int because ceil returns a float in py2.
-                d = int(math.ceil(math.log10(self.PREFIX_FACTOR / n))) - 1
+                # We need int because floor returns a float in py2.
+                # if 1000 <= n < 1024 d can be negative, cap to 0 decimals
+                d = max(0, int(2 - math.floor(math.log10(n))))
                 f.frac_prec = (d, d)
-                return babel.units.format_unit(
-                    n, "digital-%s" % unit, length="short", format=f,
-                    locale=self.locale)
-        return babel.units.format_unit(
-            round(n), "digital-%s" % self.SIZE_UNITS[-1], length="short",
-            locale=self.locale)
+                return (self.gettext(unit)
+                        % babel.numbers.format_decimal(n, format=f,
+                                                       locale=self.locale))
+        return (self.gettext(self.SIZE_UNITS[-1])
+                % babel.numbers.format_decimal(round(n), locale=self.locale))
 
     def format_decimal(self, n):
         """Format a (possibly decimal) number

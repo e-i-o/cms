@@ -36,14 +36,11 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from future.builtins.disabled import *  # noqa
 from future.builtins import *  # noqa
-from six import with_metaclass
 
 import io
 import logging
 import os
-import re
 import shutil
-from abc import ABCMeta, abstractmethod
 
 from cms import config
 from cms.grading import JobException
@@ -99,14 +96,15 @@ def delete_sandbox(sandbox, job, success=None):
 
     # If the job was not successful, we keep the sandbox around.
     if not success:
-        logger.warning("Sandbox %s kept around because job did not succeeded.",
-                       sandbox.outer_temp_dir)
-    elif not config.keep_sandbox:
-        try:
-            sandbox.delete()
-        except (IOError, OSError):
-            err_msg = "Couldn't delete sandbox."
-            logger.warning(err_msg, exc_info=True)
+        logger.warning("Sandbox %s kept around because job did not succeed.",
+                       sandbox.get_root_path())
+
+    delete = success and not config.keep_sandbox and not job.keep_sandbox
+    try:
+        sandbox.cleanup(delete=delete)
+    except (IOError, OSError):
+        err_msg = "Couldn't delete sandbox."
+        logger.warning(err_msg, exc_info=True)
 
 
 def is_manager_for_compilation(filename, language):
@@ -174,7 +172,7 @@ def check_executables_number(job, n_executables):
     return True
 
 
-def check_files_number(job, n_files):
+def check_files_number(job, n_files, or_more=False):
     """Check that the required number of files were provided by the user.
 
     A mismatch here is likely caused by having had, at submission time, a wrong
@@ -185,11 +183,17 @@ def check_files_number(job, n_files):
 
     job (Job): the job currently running.
     n_files (int): the required number of files.
+    or_more (bool): whether more than the required number is also fine.
 
     return (bool): whether there is the right number of files in the job.
 
     """
-    if len(job.files) != n_files:
+    if or_more and len(job.files) < n_files:
+        msg = "submission contains %d files, at least %d are required; " \
+              "ensure the submission format is correct."
+        set_configuration_error(job, msg, len(job.files), n_files)
+        return False
+    if not or_more and len(job.files) != n_files:
         msg = "submission contains %d files, exactly %d are required; " \
               "ensure the submission format is correct."
         set_configuration_error(job, msg, len(job.files), n_files)
@@ -256,7 +260,7 @@ def eval_output(file_cacher, job, checker_codename,
 
         # Create a brand-new sandbox just for checking.
         sandbox = create_sandbox(file_cacher, name="check")
-        job.sandboxes.append(sandbox.path)
+        job.sandboxes.append(sandbox.get_root_path())
 
         # Put user output in the sandbox.
         if user_output_path is not None:
@@ -285,199 +289,3 @@ def eval_output(file_cacher, job, checker_codename,
                 outcome, text = white_diff_fobj_step(
                     user_output_fobj, correct_output_fobj)
         return True, outcome, text
-
-
-class TaskType(with_metaclass(ABCMeta, object)):
-    """Base class with common operation that (more or less) all task
-    types must do sometimes.
-
-    - finish_(compilation, evaluation_testcase, evaluation): these
-      finalize the given operation, writing back to the submission the
-      new information, and deleting the sandbox if needed;
-
-    - *_sandbox_*: these are utility to create and delete the sandbox,
-       and to ask it to do some operation. If the operation fails, the
-       sandbox is deleted.
-
-    - compile, evaluate_testcase, evaluate: these actually do the
-      operations; must be overloaded.
-
-    """
-
-    # If ALLOW_PARTIAL_SUBMISSION is True, then we allow the user to
-    # submit only some of the required files; moreover, we try to fill
-    # the non-provided files with the one in the previous submission.
-    ALLOW_PARTIAL_SUBMISSION = False
-
-    # A list of all the accepted parameters for this task type.
-    # Each item is an instance of TaskTypeParameter.
-    ACCEPTED_PARAMETERS = []
-
-    @classmethod
-    def parse_handler(cls, handler, prefix):
-        """Ensure that the parameters list template agrees with the
-        parameters actually passed.
-
-        handler (type): the Tornado handler with the parameters.
-        prefix (string): the prefix of the parameter names in the
-            handler.
-
-        return (list): parameters list correctly formatted, or
-            ValueError if the parameters are not correct.
-
-        """
-        new_parameters = []
-        for parameter in cls.ACCEPTED_PARAMETERS:
-            try:
-                new_value = parameter.parse_handler(handler, prefix)
-                new_parameters.append(new_value)
-            except ValueError as error:
-                raise ValueError("Invalid parameter %s: %s."
-                                 % (parameter.name, error))
-        return new_parameters
-
-    def __init__(self, parameters):
-        """Instantiate a new TaskType with the given parameters.
-
-        parameters (list): a list of data structures that matches the
-            format described in ACCEPTED_PARAMETERS (they often come
-            from Dataset.task_type_parameters and, in that case, they
-            have to be already decoded from JSON).
-
-        """
-        self.parameters = parameters
-        self.validate_parameters()
-
-    def validate_parameters(self):
-        """Validate the parameters syntactically.
-
-        raise (ValueError): if the parameters are malformed.
-
-        """
-        if not isinstance(self.parameters, list):
-            raise ValueError(
-                "Task type parameters for %s are not a list" % self.__class__)
-
-        if len(self.parameters) != len(self.ACCEPTED_PARAMETERS):
-            raise ValueError(
-                "Task type %s should have %s parameters, received %s" %
-                (self.__class__,
-                 len(self.ACCEPTED_PARAMETERS),
-                 len(self.parameters)))
-
-        for value, parameter in zip(self.parameters, self.ACCEPTED_PARAMETERS):
-            parameter.validate(value)
-
-    @property
-    def name(self):
-        """Returns the name of the TaskType.
-
-        Returns a human-readable name that is shown to the user in CWS
-        to describe this TaskType.
-
-        return (str): the name
-
-        """
-        # de-CamelCase the name, capitalize it and return it
-        return re.sub("([A-Z])", r" \g<1>",
-                      self.__class__.__name__).strip().capitalize()
-
-    # Whether user tests are enabled for task of this type (provided they are
-    # enabled in the contest).
-    testable = True
-
-    @abstractmethod
-    def get_compilation_commands(self, submission_format):
-        """Return the compilation commands for all supported languages
-
-        submission_format ([string]): the list of files provided by the
-            user that have to be compiled (the compilation command may
-            contain references to other files like graders, stubs, etc...);
-            they may contain the string ".%l" as a language-wildcard.
-
-        return ({string: [[string]]}|None): for each language (indexed
-            by its name) provide a list of commands, each as a list of
-            tokens. That is because some languages may require
-            multiple operations to compile or because some task types
-            may require multiple independent compilations
-            (e.g. encoder and decoder); return None if no compilation
-            is required (e.g. output only).
-
-        """
-        pass
-
-    @abstractmethod
-    def get_user_managers(self):
-        """Return the managers that must be provided by the user when
-        requesting a user test.
-
-        return (list of str): a list of filenames (they may include a
-                              '%l' as a "language wildcard").
-
-        """
-        pass
-
-    @abstractmethod
-    def get_auto_managers(self):
-        """Return the managers that must be provided by the
-        EvaluationService (picking them from the Task) when compiling
-        or evaluating a user test.
-
-        return (list of str): a list of filenames (they may include a
-                             '%l' as a "language wildcard").
-
-        """
-        pass
-
-    @abstractmethod
-    def compile(self, job, file_cacher):
-        """Try to compile the given CompilationJob.
-
-        Set job.success to True when *our infrastracture* is successful
-        (i.e. the compilation may succeed or fail), and to False when
-        the compilation fails because of environmental problems (trying
-        again to compile the same submission in a sane environment
-        should lead to True).
-
-        job (CompilationJob): the data structure that contains details
-                              about the work that has to be done and
-                              that will hold its results.
-        file_cacher (FileCacher): the file cacher to use to obtain the
-                                  required files and to store the ones
-                                  that are produced.
-
-        """
-        pass
-
-    @abstractmethod
-    def evaluate(self, job, file_cacher):
-        """Try to evaluate the given EvaluationJob.
-
-        Set job.success to True when *our infrastracture* is successful
-        (i.e. the actual program may score or not), and to False when
-        the evaluation fails because of environmental problems (trying
-        again to compile the same submission in a sane environment
-        should lead to True).
-
-        job (EvaluationJob): the data structure that contains details
-                             about the work that has to be done and
-                             that will hold its results.
-        file_cacher (FileCacher): the file cacher to use to obtain the
-                                  required files and to store the ones
-                                  that are produced.
-
-        """
-        pass
-
-    def execute_job(self, job, file_cacher):
-        """Call compile() or execute() depending on the job passed
-        when constructing the TaskType.
-
-        """
-        if isinstance(job, CompilationJob):
-            self.compile(job, file_cacher)
-        elif isinstance(job, EvaluationJob):
-            self.evaluate(job, file_cacher)
-        else:
-            raise ValueError("The job isn't neither CompilationJob "
-                             "or EvaluationJob")

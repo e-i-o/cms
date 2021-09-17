@@ -2,8 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
-# Copyright © 2012-2013 Bernard Blackham <bernard@largestprime.net>
-# Copyright © 2014-2015 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2018 Stefano Maggiolo <s.maggiolo@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -25,29 +24,12 @@ from __future__ import unicode_literals
 from future.builtins.disabled import *  # noqa
 from future.builtins import *  # noqa
 
-task_info = {
-    "name": "communication",
-    "title": "Test Communication Task",
-    "official_language": "",
-    "submission_format_choice": "other",
-    "submission_format": "communication.%l",
-    "time_limit_{{dataset_id}}": "1.0",
-    "memory_limit_{{dataset_id}}": "128",
-    "task_type_{{dataset_id}}": "Communication",
-    "TaskTypeOptions_{{dataset_id}}_Communication_num_processes": "1",
-    "score_type_{{dataset_id}}": "Sum",
-    "score_type_parameters_{{dataset_id}}": "50",
-}
 
-managers = [
-    "stub.c",
-    "stub.cpp",
-    "stub.pas",
-    "stub.java",
-    "manager",
-]
+# Task score modes.
 
-test_cases = [
-    ("1.in", "1.out", True),
-    ("2.in", "2.out", False),
-]
+# Maximum score amongst all submissions.
+SCORE_MODE_MAX = "max"
+# Sum of maximum score for each subtask over all submissions.
+SCORE_MODE_MAX_SUBTASK = "max_subtask"
+# Maximum score among all tokened submissions and the last submission.
+SCORE_MODE_MAX_TOKENED_LAST = "max_tokened_last"

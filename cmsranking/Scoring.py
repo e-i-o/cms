@@ -3,6 +3,8 @@
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2011-2013 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2018 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2018 William Di Luigi <williamdiluigi@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -24,9 +26,13 @@ from __future__ import unicode_literals
 from future.builtins.disabled import *  # noqa
 from future.builtins import *  # noqa
 from six import itervalues, iteritems
+from six.moves import zip_longest
 
 import heapq
 import logging
+
+from cmscommon.constants import \
+    SCORE_MODE_MAX, SCORE_MODE_MAX_SUBTASK, SCORE_MODE_MAX_TOKENED_LAST
 
 
 logger = logging.getLogger(__name__)
@@ -77,7 +83,7 @@ class Score(object):
     # but cms assures that the order in which the subchanges have to
     # be processed is the ascending order of their keys (actually,
     # this is enforced only for subchanges with the same time).
-    def __init__(self, score_mode="max_tokened_last"):
+    def __init__(self, score_mode):
         # The submissions in their current status.
         self._submissions = dict()
 
@@ -117,13 +123,21 @@ class Score(object):
                  self._submissions[s_id].time > self._last.time):
             self._last = self._submissions[s_id]
 
-        if self._score_mode == "max":
+        if self._score_mode == SCORE_MODE_MAX:
             score = max([0.0] +
                         [submission.score
                          for submission in itervalues(self._submissions)])
-        else:
+        elif self._score_mode == SCORE_MODE_MAX_SUBTASK:
+            scores_by_submission = (map(float, s.extra or [])
+                                    for s in itervalues(self._submissions))
+            scores_by_subtask = zip_longest(*scores_by_submission,
+                                            fillvalue=0.0)
+            score = float(sum(max(s) for s in scores_by_subtask))
+        elif self._score_mode == SCORE_MODE_MAX_TOKENED_LAST:
             score = max(self._released.query(),
                         self._last.score if self._last is not None else 0.0)
+        else:
+            raise ValueError("Unexpected score mode '%s'" % self._score_mode)
 
         if score != self.get_score():
             self._history.append((change.time, score))

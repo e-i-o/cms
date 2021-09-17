@@ -3,7 +3,7 @@
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2010-2014 Giovanni Mascellani <mascellani@poisson.phc.unipi.it>
-# Copyright © 2010-2014 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2010-2018 Stefano Maggiolo <s.maggiolo@gmail.com>
 # Copyright © 2010-2012 Matteo Boscariol <boscarim@hotmail.com>
 # Copyright © 2012-2018 Luca Wehrstedt <luca.wehrstedt@gmail.com>
 # Copyright © 2013 Bernard Blackham <bernard@largestprime.net>
@@ -44,12 +44,12 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.orm.collections import attribute_mapped_collection
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 
-from cms import SCORE_MODE_MAX, SCORE_MODE_MAX_TOKENED_LAST, \
-    TOKEN_MODE_DISABLED, TOKEN_MODE_FINITE, TOKEN_MODE_INFINITE
-from cms.db.validation import FilenameListConstraint
+from cms import TOKEN_MODE_DISABLED, TOKEN_MODE_FINITE, TOKEN_MODE_INFINITE, \
+    FEEDBACK_LEVEL_FULL, FEEDBACK_LEVEL_RESTRICTED
+from cmscommon.constants import \
+    SCORE_MODE_MAX, SCORE_MODE_MAX_SUBTASK, SCORE_MODE_MAX_TOKENED_LAST
 
-from . import Base, Contest, CodenameConstraint, FilenameConstraint, \
-    DigestConstraint
+from . import Codename, Filename, FilenameSchemaArray, Digest, Base, Contest
 
 
 class Task(Base):
@@ -99,8 +99,7 @@ class Task(Base):
 
     # Short name and long human readable title of the task.
     name = Column(
-        Unicode,
-        CodenameConstraint("name"),
+        Codename,
         nullable=False,
         unique=True)
     title = Column(
@@ -110,8 +109,7 @@ class Task(Base):
     # The names of the files that the contestant needs to submit (with
     # language-specific extensions replaced by "%l").
     submission_format = Column(
-        ARRAY(String),
-        FilenameListConstraint("submission_format"),
+        FilenameSchemaArray,
         nullable=False,
         default=[])
 
@@ -137,7 +135,7 @@ class Task(Base):
         Enum(TOKEN_MODE_DISABLED, TOKEN_MODE_FINITE, TOKEN_MODE_INFINITE,
              name="token_mode"),
         nullable=False,
-        default="disabled")
+        default=TOKEN_MODE_DISABLED)
 
     # The maximum number of tokens a contestant is allowed to use
     # during the whole contest (on this tasks).
@@ -200,6 +198,15 @@ class Task(Base):
         CheckConstraint("min_user_test_interval > '0 seconds'"),
         nullable=True)
 
+    # What information users can see about the evaluations of their
+    # submissions. Offering full information might help some users to
+    # reverse engineer task data.
+    feedback_level = Column(
+        Enum(FEEDBACK_LEVEL_FULL, FEEDBACK_LEVEL_RESTRICTED,
+             name="feedback_level"),
+        nullable=False,
+        default=FEEDBACK_LEVEL_RESTRICTED)
+
     # The scores for this task will be rounded to this number of
     # decimal places.
     score_precision = Column(
@@ -210,7 +217,9 @@ class Task(Base):
 
     # Score mode for the task.
     score_mode = Column(
-        Enum(SCORE_MODE_MAX_TOKENED_LAST, SCORE_MODE_MAX,
+        Enum(SCORE_MODE_MAX_TOKENED_LAST,
+             SCORE_MODE_MAX,
+             SCORE_MODE_MAX_SUBTASK,
              name="score_mode"),
         nullable=False,
         default=SCORE_MODE_MAX_TOKENED_LAST)
@@ -303,8 +312,7 @@ class Statement(Base):
 
     # Digest of the file.
     digest = Column(
-        String,
-        DigestConstraint("digest"),
+        Digest,
         nullable=False)
 
 
@@ -336,12 +344,10 @@ class Attachment(Base):
 
     # Filename and digest of the provided attachment.
     filename = Column(
-        Unicode,
-        FilenameConstraint("filename"),
+        Filename,
         nullable=False)
     digest = Column(
-        String,
-        DigestConstraint("digest"),
+        Digest,
         nullable=False)
 
 
@@ -451,8 +457,8 @@ class Dataset(Base):
     def task_type_object(self):
         if not hasattr(self, "_cached_task_type_object") \
                 or self.task_type != self._cached_task_type \
-                or self.task_type_parameters \
-                   != self._cached_task_type_parameters:
+                or (self.task_type_parameters
+                    != self._cached_task_type_parameters):
             # Import late to avoid a circular dependency.
             from cms.grading.tasktypes import get_task_type
             # This can raise.
@@ -468,11 +474,12 @@ class Dataset(Base):
 
     @property
     def score_type_object(self):
-        public_testcases = {k: tc.public for k, tc in iteritems(self.testcases)}
+        public_testcases = {k: tc.public
+                            for k, tc in iteritems(self.testcases)}
         if not hasattr(self, "_cached_score_type_object") \
                 or self.score_type != self._cached_score_type \
-                or self.score_type_parameters \
-                   != self._cached_score_type_parameters \
+                or (self.score_type_parameters
+                    != self._cached_score_type_parameters) \
                 or public_testcases != self._cached_public_testcases:
             # Import late to avoid a circular dependency.
             from cms.grading.scoretypes import get_score_type
@@ -565,12 +572,10 @@ class Manager(Base):
 
     # Filename and digest of the provided manager.
     filename = Column(
-        Unicode,
-        FilenameConstraint("filename"),
+        Filename,
         nullable=False)
     digest = Column(
-        String,
-        DigestConstraint("digest"),
+        Digest,
         nullable=False)
 
 
@@ -601,8 +606,7 @@ class Testcase(Base):
 
     # Codename identifying the testcase.
     codename = Column(
-        Unicode,
-        CodenameConstraint("codename"),
+        Codename,
         nullable=False)
 
     # If the testcase outcome is going to be showed to the user (even
@@ -614,10 +618,8 @@ class Testcase(Base):
 
     # Digests of the input and output files.
     input = Column(
-        String,
-        DigestConstraint("input"),
+        Digest,
         nullable=False)
     output = Column(
-        String,
-        DigestConstraint("output"),
+        Digest,
         nullable=False)

@@ -37,11 +37,10 @@ from sqlalchemy import union
 from sqlalchemy.exc import OperationalError
 
 from cms import ConfigError
-from cms.db.filecacher import FileCacher
-from . import SessionGen, Contest, Participation, Statement, Attachment, Task, \
-    Manager, Dataset, Testcase, Submission, File, SubmissionResult, \
-    Executable, UserTest, UserTestFile, UserTestManager, UserTestResult, \
-    UserTestExecutable, PrintJob
+from . import SessionGen, Digest, Contest, Participation, Statement, \
+    Attachment, Task, Manager, Dataset, Testcase, Submission, File, \
+    SubmissionResult, Executable, UserTest, UserTestFile, UserTestManager, \
+    UserTestResult, UserTestExecutable, PrintJob
 
 
 def test_db_connection():
@@ -304,7 +303,7 @@ def enumerate_files(
     queries.append(dataset_q.join(Dataset.testcases)
                    .with_entities(Testcase.input))
     queries.append(dataset_q.join(Dataset.testcases)
-                   .with_entities(Testcase.input))
+                   .with_entities(Testcase.output))
 
     if not skip_submissions:
         submission_q = task_q.join(Task.submissions)
@@ -338,5 +337,5 @@ def enumerate_files(
 
     # union(...).execute() would be executed outside of the session.
     digests = set(r[0] for r in session.execute(union(*queries)))
-    digests.discard(FileCacher.TOMBSTONE_DIGEST)
+    digests.discard(Digest.TOMBSTONE)
     return digests

@@ -1,0 +1,35 @@
+version: "3.3"
+services:
+    db:
+        image: postgres:9.5
+        container_name: postgres
+        environment:
+            POSTGRES_USER: "cmsuser"
+            POSTGRES_PASSWORD: "cmspass"
+            POSTGRES_DB: "cmsdb"
+        ports:
+          - 5432:5432
+        expose:
+          - 5432
+        volumes:
+          - my-db:/var/lib/postgresql/data/
+    cms:
+        build:
+            context: .
+        image: eio/cms
+        container_name: cms
+        links:
+            - db
+        depends_on:
+            - db
+        volumes:
+          - .:/cms
+          - /sys/fs/cgroup:/sys/fs/cgroup:rw
+        privileged: true
+        ports:
+            - 8888:8888
+            - 8889:8889
+        command: cmsLogService
+
+volumes:
+    my-db:
