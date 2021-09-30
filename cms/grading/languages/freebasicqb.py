@@ -50,5 +50,5 @@ class FreeBasicQb(CompiledLanguage):
                                  for_evaluation=True):
         """See Language.get_compilation_commands."""
         compile_command = ["/usr/local/bin/fbc", "-lang", "qb",
-                           "-x", executable_filename, "-b", *source_filenames]
+                           "-x", executable_filename, "-b"] + source_filenames
         return [compile_command]
