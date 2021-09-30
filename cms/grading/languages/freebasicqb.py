@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
-# Copyright © 2021 Rao Zvorovski
+# Copyright © 2021 Rao Zvorovski <rao.zvorovski@ut.ee>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -27,7 +27,7 @@ from future.builtins import *  # noqa
 from cms.grading import CompiledLanguage
 
 
-__all__ = ["FreeBasic"]
+__all__ = ["FreeBasicQb"]
 
 
 class FreeBasicQb(CompiledLanguage):
