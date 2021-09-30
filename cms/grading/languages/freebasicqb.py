@@ -45,15 +45,10 @@ class FreeBasicQb(CompiledLanguage):
         """See Language.source_extensions."""
         return [".bas"]
 
-    @property
-    def requires_multithreading(self):
-        """See Language.requires_multithreading."""
-        return False
-
     def get_compilation_commands(self,
                                  source_filenames, executable_filename,
                                  for_evaluation=True):
         """See Language.get_compilation_commands."""
-        compile_command = ["/usr/bin/fbc", "-lang", "qb",
+        compile_command = ["/usr/local/bin/fbc", "-lang", "qb",
                            "-x", executable_filename, "-b", *source_filenames]
         return [compile_command]
