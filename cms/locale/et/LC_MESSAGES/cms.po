@@ -522,7 +522,7 @@ msgid "Failed to log in."
 msgstr "Sisselogimine ebaõnnestus."
 
 msgid "Welcome"
-msgstr "Teretulemast"
+msgstr "Tere tulemast"
 
 msgid "Please log in"
 msgstr "Palun logi sisse"
@@ -535,6 +535,9 @@ msgstr "Parool"
 
 msgid "Login"
 msgstr "Logi sisse"
+
+msgid "Registration and information"
+msgstr "Registreerumine ja lisainfo"
 
 msgid "New message"
 msgstr "Uus sõnum"
