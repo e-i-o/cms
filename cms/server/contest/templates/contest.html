@@ -89,6 +89,7 @@ $(document).ready(function () {
         <div class="login_container">
             <div class="login_box hero-unit">
                 <h1>{% trans %}Welcome{% endtrans %}</h1>
+		<p></p>
                 <p>{% trans %}Please log in{% endtrans %}</p>
                 <form class="form-horizontal" action="{{ contest_url("login") }}" method="POST">
                     {{ xsrf_form_html|safe }}
@@ -117,6 +118,8 @@ $(document).ready(function () {
                         </div>
                     </fieldset>
                 </form>
+		<p></p>
+		<p><a href="https://eio.ee/">{% trans %}Registration and information{% endtrans %}</a></p>
             </div>
         </div>
 {% else %}
