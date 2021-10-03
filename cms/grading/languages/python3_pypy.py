@@ -39,7 +39,7 @@ class Python3Pypy(PythonBase):
 
     @property
     def interpreter(self):
-        return "/opt/pypy3.6-v7.2.0-linux64/bin/pypy3"
+        return "/usr/bin/pypy3.7"
 
     @property
     def name(self):
