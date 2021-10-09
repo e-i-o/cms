@@ -3,7 +3,7 @@
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2016-2017 Stefano Maggiolo <s.maggiolo@gmail.com>
-# Copyright © 2019-2020 Ahto Truu <ahto.truu@ut.ee>
+# Copyright © 2021 Ahto Truu <ahto.truu@ut.ee>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -18,7 +18,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Python programming language, version 2, definition."""
+"""JavaScript programming language, via Node.JS."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -27,23 +27,24 @@ from __future__ import unicode_literals
 from future.builtins.disabled import *  # noqa
 from future.builtins import *  # noqa
 
-from cms.grading.languages.python import PythonBase
+from cms.grading.language import InterpretedLanguage
 
 
-__all__ = ["Python2CPython"]
-
-
-class Python2CPython(PythonBase):
-    """This defines the Python programming language, version 2 (more
-    precisely, the subversion of Python 2 available on the system,
-    usually 2.7) using the default interpeter in the system.
+class JavaScriptNode(InterpretedLanguage):
+    """This defines the JavaScript programming language, interpreted with the
+    Node.JS runtime.
     """
-
-    @property
-    def interpreter(self):
-        return "/usr/bin/python2"
 
     @property
     def name(self):
         """See Language.name."""
-        return "Python 2 / CPython"
+        return "JavaScript"
+
+    @property
+    def source_extensions(self):
+        """See Language.source_extensions."""
+        return [".js"]
+
+    @property
+    def interpreter(self):
+        return "/usr/bin/node"

@@ -202,6 +202,7 @@ setup(
             "Rust=cms.grading.languages.rust:Rust",
             "Go=cms.grading.languages.golang:GoLang",
             "BASIC (QB)=cms.grading.languages.freebasicqb:FreeBasicQb",
+            "JavaScript / Node.JS=cms.grading.languages.javascript_node:JavaScriptNode",
         ],
     },
     keywords="ioi programming contest grader management system",
