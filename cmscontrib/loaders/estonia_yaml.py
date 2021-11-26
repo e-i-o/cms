@@ -430,6 +430,7 @@ class EstYamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
         load(conf, args, "max_user_test_number")
         load(conf, args, "min_submission_interval", conv=make_timedelta)
         load(conf, args, "min_user_test_interval", conv=make_timedelta)
+        load(conf, args, "divisions")
 
         # Attachments
         args["attachments"] = dict()

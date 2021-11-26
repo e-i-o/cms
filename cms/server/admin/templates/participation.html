@@ -70,6 +70,13 @@ function update_additional_answer(element, invoker)
       </tr>
       <tr>
         <td>
+          <span class="info" title="The division the user participates in; all tasks are shown if this is empty."></span>
+          Division
+        </td>
+        <td><input type="text" name="division" value="{{ participation.division if participation.division is not none else "" }}"/></td>
+      </tr>
+      <tr>
+        <td>
           <span class="info" title="Contestant password for this contest. If empty, the contestant's main password is used.
                                      Caution: stored in plain text."></span>
           Password
