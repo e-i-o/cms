@@ -63,6 +63,13 @@ $("select[name=task_type_{{ dataset.id }}]").change(function() {
       </tr>
       <tr>
         <td>
+          <span class="info" title="Space-separated list of divisions the task is shown to; shown to all participants if this is empty."></span>
+          Divisions
+        </td>
+        <td><input type="text" name="divisions" value="{{ task.divisions if task.divisions is not none else "" }}"/></td>
+      </tr>
+      <tr>
+        <td>
           <span class="info" title="The index of the task within the contest, if the task is associated with a contest."></span>
           Position
         </td>

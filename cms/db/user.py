@@ -250,6 +250,11 @@ class Participation(Base):
         Team,
         back_populates="participations")
 
+    # The divison the user participates in.
+    division = Column(
+        String,
+        nullable=True)
+
     # These one-to-many relationships are the reversed directions of
     # the ones defined in the "child" classes using foreign keys.
 
