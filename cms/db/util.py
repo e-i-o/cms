@@ -162,13 +162,14 @@ def get_submissions(
     participation_id: int | None = None,
     task_id: int | None = None,
     submission_id: int | None = None,
+    language: str | None = None,
 ) -> Query:
     """Search for submissions that match the given criteria
 
-    The submissions will be returned as a list, and the last four
+    The submissions will be returned as a list, and the last five
     parameters determine the filters used to decide which submissions
     to include. Some of them are incompatible, that is they cannot be
-    non-None at the same time. When this happens it means that one of
+    non-None at the same time. This happens when one of
     the parameters "implies" the other (for example, giving the
     participation already gives the contest it belongs to). Trying to
     give them both is useless and could only lead to inconsistencies
@@ -181,6 +182,7 @@ def get_submissions(
     task_id: id of the task to filter with, or None.
     submission_id: id of the submission to filter with, or
         None.
+    language: the (programming) language to filter with, or None.
 
     return: a query for the list of submission that match the
         given criteria
@@ -198,6 +200,8 @@ def get_submissions(
     if submission_id is not None and participation_id is not None:
         raise ValueError(
             "participation_id is superfluous if submission_id is given")
+    if submission_id is not None and language is not None:
+        raise ValueError("language is superfluous if submission_id is given")
 
     query = session.query(Submission)
     if submission_id is not None:
@@ -207,6 +211,8 @@ def get_submissions(
             .filter(Participation.id == participation_id)
     if task_id is not None:
         query = query.filter(Submission.task_id == task_id)
+    if language is not None:
+        query = query.filter(Submission.language == language)
     if contest_id is not None:
         query = query.join(Participation) \
             .filter(Participation.contest_id == contest_id) \
@@ -221,14 +227,15 @@ def get_submission_results(
     task_id: int | None = None,
     submission_id: int | None = None,
     dataset_id: int | None = None,
+    language: str | None = None,
 ) -> Query:
     """Search for submission results that match the given criteria
 
     The submission results will be returned as a list, and the last
-    five parameters determine the filters used to decide which
+    six parameters determine the filters used to decide which
     submission results to include. Some of them are incompatible, that
-    is they cannot be non-None at the same time. When this happens it
-    means that one of the parameters "implies" the other (for example,
+    is they cannot be non-None at the same time. This happens when
+    one of the parameters "implies" the other (for example,
     giving the participation already gives the contest it belongs
     to). Trying to give them both is useless and could only lead to
     inconsistencies and errors.
@@ -241,6 +248,7 @@ def get_submission_results(
     submission_id: id of the submission to filter with, or
         None.
     dataset_id: id of the dataset to filter with, or None.
+    language: the (programming) language to filter with, or None.
 
     return: a query for the list of submission results that
         match the given criteria
@@ -258,6 +266,8 @@ def get_submission_results(
     if submission_id is not None and participation_id is not None:
         raise ValueError(
             "participation_id is superfluous if submission_id is given")
+    if submission_id is not None and language is not None:
+        raise ValueError("language is superfluous if submission_id is given")
     if dataset_id is not None and task_id is not None:
         raise ValueError("task_id is superfluous if dataset_id is given")
     if dataset_id is not None and contest_id is not None:
@@ -273,6 +283,8 @@ def get_submission_results(
             .filter(Participation.id == participation_id)
     if task_id is not None:
         query = query.filter(Submission.task_id == task_id)
+    if language is not None:
+        query = query.filter(Submission.language == language)
     if contest_id is not None:
         query = query.join(Participation) \
             .filter(Participation.contest_id == contest_id)\
