@@ -860,6 +860,7 @@ class EvaluationService(TriggeredService):
                               testcase_id=None,
                               participation_id=None,
                               task_id=None,
+                              language=None,
                               level="compilation",
                               archive_sandbox=False):
         """Request to invalidate some computed data.
@@ -915,7 +916,7 @@ class EvaluationService(TriggeredService):
                 contest_id
                 if {participation_id, task_id, submission_id} == {None}
                 else None,
-                participation_id, task_id, submission_id).all()
+                participation_id, task_id, submission_id, language).all()
 
             # Then we get all relevant operations, and we remove them
             # both from the queue and from the pool (i.e., we ignore
@@ -947,7 +948,7 @@ class EvaluationService(TriggeredService):
                 # Provide the task_id only if the entire task has to be
                 # reevaluated and not only a specific dataset.
                 task_id if dataset_id is None else None,
-                submission_id, dataset_id).all()
+                submission_id, dataset_id, language).all()
             logger.info("Submission results to invalidate %s for: %d.",
                         level, len(submission_results))
             for submission_result in submission_results:

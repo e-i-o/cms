@@ -2,19 +2,23 @@
                              submission_id=None,
                              dataset_id=None,
                              participation_id=None,
-                             contest_id=None) %}
+                             contest_id=None,
+                             language=None) %}
 {#
 Render reevaluation buttons for the given filters.
 
 These are the possible configuration of not-none arguments received:
 - submission_id and dataset_id: reevaluate the submission result of the
   given submission on the given dataset;
-- dataset_id: reevaluate all submission results of the given dataset
+- dataset_id and optionally language: reevaluate either all submission
+  results of the given dataset, or just the ones in the given language
   (they belong to the submissions for the dataset's task);
-- participation_id: reevaluate all submission results (on all datasets)
-  of the submissions that were handed in by the given participation;
-- contest_id: reevaluate all submission results of the contest (of all
-  participations and tasks, for all datasets).
+- participation_id and optionally language: reevaluate either all submission
+  results (on all datasets) of the submissions that were handed in by
+  the given participation, or just the ones written in the given language;
+- contest_id and optionally language: reevaluate either all submission results
+  of the contest (of all participations and tasks, for all datasets), or
+  just ones written in the given language.
 
 next_page (str): the URL to redirect to after the invalidation request
     has been sent.
@@ -22,16 +26,32 @@ submission_id (int|None): id of the submission to invalidate.
 dataset_id (int|None): id of the dataset to invalidate.
 participation_id (int|None): id of the participation to invalidate.
 contest_id (int|None): the id of the contest to invalidate.
+language (string|None): the language of submissions to invalidate.
 #}
 {% if submission_id is not none and dataset_id is not none %}
   {% set invalidate_arguments = {"submission_id": submission_id,
                                  "dataset_id": dataset_id} %}
 {% elif dataset_id is not none %}
-  {% set invalidate_arguments = {"dataset_id": dataset_id} %}
+  {% if language is none %}
+    {% set invalidate_arguments = {"dataset_id": dataset_id} %}
+  {% else %}
+    {% set invalidate_arguments = {"dataset_id": dataset_id,
+                                   "language": language} %}
+  {% endif %}
 {% elif participation_id is not none %}
-  {% set invalidate_arguments = {"participation_id": participation_id} %}
+  {% if language is none %}
+    {% set invalidate_arguments = {"participation_id": participation_id} %}
+  {% else %}
+    {% set invalidate_arguments = {"participation_id": participation_id,
+                                   "language": language} %}
+  {% endif %}
 {% elif contest_id is not none %}
-  {% set invalidate_arguments = {"contest_id": contest_id} %}
+  {% if language is none %}
+    {% set invalidate_arguments = {"contest_id": contest_id} %}
+  {% else %}
+    {% set invalidate_arguments = {"contest_id": contest_id,
+                                   "language": language} %}
+  {% endif %}
 {% endif %}
 <button onclick="cmsrpc_request(
                  'EvaluationService', 0,
