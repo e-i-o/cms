@@ -11,7 +11,10 @@
 
 <h2 id="title_submissions" class="toggling_on">Submissions</h2>
 <div id="submissions">
-  <table>
+
+  <h3 id="title_reevaluate" class="toggling_off">Reevaluate all</h3>
+  <div id="reevaluate" style="display: none;">
+  <table class="striped">
     <tr>
       <td>
         Reevaluate all {{ submission_count }} submissions for this dataset
@@ -37,6 +40,7 @@
 {% endfor %}
   </table>
   <div class="hr"></div>
+  </div>
 
   {% set page_url = url["dataset"][shown_dataset.id] %}
   {% include "fragments/submission_rows.html" %}
