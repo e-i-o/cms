@@ -8,13 +8,37 @@
 
 <div id="submissions">
 
-  <p>
-    Reevaluate all {{ submission_count }} submissions in this contest (for all datasets)
-    {{ macro_reevaluation_buttons.reevaluation_buttons(
-           admin.permission_all,
-           url("contest", contest.id, "submissions"),
-           contest_id=contest.id) }}
-  </p>
+  <h3 id="title_reevaluate" class="toggling_off">Reevaluate all</h3>
+  <div id="reevaluate" style="display: none;">
+  <table class="striped">
+    <tr>
+      <td>
+        Reevaluate all {{ submission_count }} submissions in this contest (for all datasets)
+      </td>
+      <td>
+        {{ macro_reevaluation_buttons.reevaluation_buttons(
+             admin.permission_all,
+             url("contest", contest.id, "submissions"),
+             contest_id=contest.id) }}
+      </td>
+    </tr>
+{% for lang in contest.languages %}
+    <tr>
+      <td>
+        Reevaluate all submissions in {{ lang }} in this contest
+      </td>
+      <td>
+        {{ macro_reevaluation_buttons.reevaluation_buttons(
+             admin.permission_all,
+             url("contest", contest.id, "submissions"),
+             contest_id=contest.id,
+             language="'{}'".format(lang)) }}
+      </td>
+    </tr>
+{% endfor %}
+  </table>
+  <div class="hr"></div>
+  </div>
 
   {{ macro_submission.rows(
          admin,

@@ -375,6 +375,14 @@ table.bordered tbody tr:nth-child(odd) {
     background-color: #EAEEF3;
 }
 
+table.striped tbody tr:nth-child(odd) {
+    background-color: white;
+}
+
+table.striped tbody tr:nth-child(even) {
+    background-color: #EAEEF3;
+}
+
 table.TaskTypeOptions {
     border: 1px solid gray;
     margin: 5px 0px;

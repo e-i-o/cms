@@ -37,13 +37,38 @@ function update_additional_answer(element, invoker)
 
 <h2 id="title_submissions" class="toggling_on">Submissions</h2>
 <div id="submissions">
-  <p>
-    Reevaluate all {{ submission_count }} submissions for this user in this contest (for all datasets)
-    {{ macro_reevaluation_buttons.reevaluation_buttons(
-           admin.permission_all,
-           url("contest", contest.id, "user", participation.user_id, "edit"),
-           participation_id=participation.id) }}
-  </p>
+
+  <h3 id="title_reevaluate" class="toggling_off">Reevaluate all</h3>
+  <div id="reevaluate" style="display: none;">
+  <table class="striped">
+    <tr>
+      <td>
+        Reevaluate all {{ submission_count }} submissions from this user in this contest (for all datasets)
+      </td>
+      <td>
+        {{ macro_reevaluation_buttons.reevaluation_buttons(
+             admin.permission_all,
+             url("contest", contest.id, "user", participation.user_id, "edit"),
+             participation_id=participation.id) }}
+      </td>
+    </tr>
+{% for lang in contest.languages %}
+    <tr>
+      <td>
+        Reevaluate all submissions in {{ lang }} from this user in this contest
+      </td>
+      <td>
+        {{ macro_reevaluation_buttons.reevaluation_buttons(
+             admin.permission_all,
+             url("contest", contest.id, "user", participation.user_id, "edit"),
+             participation_id=participation.id,
+             language="'{}'".format(lang)) }}
+      </td>
+    </tr>
+{% endfor %}
+  </table>
+  <div class="hr"></div>
+  </div>
 
   {{ macro_submission.rows(
          admin,
