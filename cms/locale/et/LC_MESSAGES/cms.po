@@ -38,7 +38,7 @@ msgid ""
 "caused by an excessive use of C++ templates, for example."
 msgstr ""
 
-#, fuzzy, python-format
+#, python-format
 msgid ""
 "Compilation killed with signal %s (could be triggered by violating memory "
 "limits)"
@@ -587,7 +587,6 @@ msgstr "Dokumentatsioon"
 msgid "Testing"
 msgstr "Testimine"
 
-#, fuzzy
 msgid "Printing"
 msgstr "Trükkimine"
 
@@ -844,11 +843,10 @@ msgstr "Jah"
 msgid "No"
 msgstr "Ei"
 
-#, fuzzy
 msgid "Print"
 msgstr "Trüki"
 
-#, fuzzy, python-format
+#, python-format
 msgid ""
 "You can print %(remaining_jobs)s more text or PDF files of up to "
 "%(max_pages)s pages each."
@@ -856,7 +854,7 @@ msgstr ""
 "Te võite trükkida veel %(remaining_jobs)s teksti või PDF faili, igaüks kuni "
 "%(max_pages)s lehekülge pikk."
 
-#, fuzzy, python-format
+#, python-format
 msgid ""
 "You can print %(remaining_jobs)s more text files of up to %(max_pages)s "
 "pages each."
@@ -959,23 +957,21 @@ msgid ""
 "The statement for this task is available in multiple versions, in different "
 "languages."
 msgstr ""
-"Selle ülesande tekstist on saadaval mitu versiooni, erinevates keeltes."
+"Selle ülesande tekstist on saadaval mitu versiooni erinevates keeltes."
 
-#, fuzzy
 msgid "You can see (and download) all of them using the list on the right."
-msgstr "Te võite neid näha (ja maha laadida) kasutades nimekirja paremal."
+msgstr "Te võite neid näha (ja alla laadida) kasutades paremal pool olevat nimekirja."
 
-#, fuzzy
 msgid "Some suggested translations follow."
-msgstr "Mõned soovitatud tõlked järgnevad."
+msgstr "Järgnevad mõned soovitatud tõlked."
 
-#, fuzzy, python-format
+#, python-format
 msgid "Statement in <b>%(lang)s</b>"
-msgstr "Ülesande tekst, <b>%(lang)s</b>"
+msgstr "Ülesande tekst <b>%(lang)s</b> keeles"
 
-#, fuzzy, python-format
+#, python-format
 msgid "Statement in %(lang)s"
-msgstr "Ülesande tekst, %(lang)s"
+msgstr "Ülesande tekst %(lang)s keeles"
 
 #, python-format
 msgid "<b>%(lang)s</b>"
