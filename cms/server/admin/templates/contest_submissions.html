@@ -5,12 +5,35 @@
 
 <div id="submissions">
 
-  <p>
-    Reevaluate all {{ submission_count }} submissions in this contest (for all datasets)
-    {{ ReevaluationButtons(
-           url("contest", contest.id, "submissions"),
-           contest_id=contest.id) }}
-  </p>
+  <h3 id="title_reevaluate" class="toggling_off">Reevaluate all</h3>
+  <div id="reevaluate" style="display: none;">
+  <table class="striped">
+    <tr>
+      <td>
+        Reevaluate all {{ submission_count }} submissions in this contest (for all datasets)
+      </td>
+      <td>
+        {{ ReevaluationButtons(
+             url("contest", contest.id, "submissions"),
+             contest_id=contest.id) }}
+      </td>
+    </tr>
+{% for lang in contest.languages %}
+    <tr>
+      <td>
+        Reevaluate all submissions in {{ lang }} in this contest
+      </td>
+      <td>
+        {{ ReevaluationButtons(
+             url("contest", contest.id, "submissions"),
+             contest_id=contest.id,
+             language="'{}'".format(lang)) }}
+      </td>
+    </tr>
+{% endfor %}
+  </table>
+  <div class="hr"></div>
+  </div>
 
   {% set page_url = url["contest"][contest.id]["submissions"] %}
   {% include "fragments/submission_rows.html" %}

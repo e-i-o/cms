@@ -11,12 +11,36 @@
 
 <h2 id="title_submissions" class="toggling_on">Submissions</h2>
 <div id="submissions">
-  <p>
-    Reevaluate all {{ submission_count }} submissions for this dataset
-    {{ ReevaluationButtons(
-           url("dataset", shown_dataset.id),
-           dataset_id=shown_dataset.id) }}
-  </p>
+
+  <h3 id="title_reevaluate" class="toggling_off">Reevaluate all</h3>
+  <div id="reevaluate" style="display: none;">
+  <table class="striped">
+    <tr>
+      <td>
+        Reevaluate all {{ submission_count }} submissions for this dataset
+      </td>
+      <td>
+        {{ ReevaluationButtons(
+             url("dataset", shown_dataset.id),
+             dataset_id=shown_dataset.id) }}
+      </td>
+    </tr>
+{% for lang in contest.languages %}
+    <tr>
+      <td>
+        Reevaluate all submissions in {{ lang }} for this dataset
+      </td>
+      <td>
+        {{ ReevaluationButtons(
+             url("dataset", shown_dataset.id),
+             dataset_id=shown_dataset.id,
+             language="'{}'".format(lang)) }}
+      </td>
+    </tr>
+{% endfor %}
+  </table>
+  <div class="hr"></div>
+  </div>
 
   {% set page_url = url["dataset"][shown_dataset.id] %}
   {% include "fragments/submission_rows.html" %}
