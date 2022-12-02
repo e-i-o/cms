@@ -975,6 +975,10 @@ class IsolateSandbox(SandboxBase):
         # Needed for running PyPy
         self.add_mapped_directories(["/opt"])
 
+        # Needed for running Mono
+        if os.path.isdir("/etc/mono"):
+            self.add_mapped_directories(["/etc/mono"])
+
         # Tell isolate to get the sandbox ready. We do our best to
         # cleanup after ourselves, but we might have missed something
         # if the worker was interrupted in the middle of an execution.
