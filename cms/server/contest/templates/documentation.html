@@ -46,8 +46,8 @@
 {% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".java") %}
 <h3>Java</h3>
 <p><a href="https://docs.oracle.com/javase/specs/jls/se10/html/">Java language specification</a></p>
-<p><a href="https://docs.oracle.com/en/java/javase/11/docs/api/">Java SDK reference</a></p>
-<p>{% trans %}The main Java class of the solution must have exactly the same name (and in the same case) as the task.{% endtrans %}</p>
+<p><a href="https://docs.oracle.com/en/java/javase/11/docs/api/">Java API reference</a></p>
+<p>{% trans %}The class containing the <tt>main</tt> method must have exactly the same name (and in the same case) as the task.{% endtrans %}</p>
 <p>{% trans %}The source file must not contain the <tt>package</tt> keyword.{% endtrans %}</p>
 {% endif %}
 
