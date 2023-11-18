@@ -1,31 +1,23 @@
-# syntax=docker/dockerfile:1
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
-RUN apt-get update
-RUN apt-get install -y \
-    build-essential \
-    cgroup-lite \
-    cppreference-doc-en-html \
-    fp-compiler \
-    git \
-    haskell-platform \
-    libcap-dev \
-    libcups2-dev \
-    libffi-dev \
-    libpq-dev \
-    libyaml-dev \
-    mono-mcs \
-    openjdk-8-jdk-headless \
-    php7.4-cli \
-    postgresql-client \
-    python2 \
-    python3-pip \
-    python3.8 \
-    python3.8-dev \
-    rustc \
-    sudo \
-    wait-for-it \
-    zip
+RUN apt update
+ENV TZ=Europe/Tallinn
+RUN DEBIAN_FRONTEND=noninteractive apt install -y \
+    build-essential openjdk-19-jdk-headless fp-compiler \
+    postgresql-client python3.10 cppreference-doc-en-html \
+    cgroup-lite libcap-dev zip \
+    python3.10-dev libpq-dev libcups2-dev libyaml-dev \
+    libffi-dev python3.10-venv \
+    php8.1-cli rustc mono-mcs haskell-platform \
+    golang-go pypy3 nodejs \
+    # for add-apt-repository and sudo
+    software-properties-common sudo
+
+# we want a newer ubuntu to get newer versions of compilers.
+# however, CMS targets ubuntu 20.04, with python 3.8. So pull that in manually
+RUN add-apt-repository -y ppa:deadsnakes/ppa
+RUN apt update
+RUN apt install -y python3.8 python3.8-dev python3.8-venv
 
 # Create cmsuser user with sudo privileges
 RUN useradd -ms /bin/bash cmsuser && \
@@ -35,23 +27,12 @@ RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 # Set cmsuser as default user
 USER cmsuser
 
-RUN mkdir /home/cmsuser/cms
-COPY --chown=cmsuser:cmsuser requirements.txt dev-requirements.txt /home/cmsuser/cms/
-
+# needs to be created beforehand to be owned by cmsuser
+RUN mkdir -p /home/cmsuser/cms
 WORKDIR /home/cmsuser/cms
-
-RUN sudo pip3 install -r requirements.txt
-RUN sudo pip3 install -r dev-requirements.txt
-
-COPY --chown=cmsuser:cmsuser . /home/cmsuser/cms
-
-RUN sudo python3 setup.py install
-
-RUN sudo python3 prerequisites.py --yes --cmsuser=cmsuser install
-
-RUN sudo sed 's|/cmsuser:your_password_here@localhost:5432/cmsdb"|/postgres@cms_test_db:5432/cmsdbfortesting"|' ./config/cms.conf.sample \
-    | sudo tee /usr/local/etc/cms-testdb.conf
-
-ENV LANG C.UTF-8
-
-CMD [""]
+COPY --chown=cmsuser:cmsuser requirements.txt .
+RUN python3.8 -m venv venv
+RUN venv/bin/pip install -r requirements.txt
+COPY --chown=cmsuser:cmsuser . .
+RUN sudo python3.8 prerequisites.py --yes --cmsuser=cmsuser install
+RUN venv/bin/python setup.py install
