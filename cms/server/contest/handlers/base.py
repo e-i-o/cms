@@ -90,7 +90,7 @@ class BaseHandler(CommonRequestHandler):
             LanguageAccept).values()
         automatic_lang = choose_language_code(browser_langs, lang_codes)
         if automatic_lang is None:
-            automatic_lang = lang_codes[0]
+            automatic_lang = "et" # lang_codes[0]
         self.automatic_translation = \
             self.available_translations[automatic_lang]
 
