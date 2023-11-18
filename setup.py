@@ -195,6 +195,7 @@ setup(
             "Python 3 / CPython=cms.grading.languages.python3_cpython:Python3CPython",
             "Rust=cms.grading.languages.rust:Rust",
             "JavaScript / Node.js=cms.grading.languages.javascript_node:JavaScriptNode",
+            "Go=cms.grading.languages.golang:GoLang",
         ],
     },
     keywords="ioi programming contest grader management system",
