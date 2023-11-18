@@ -1,6 +1,13 @@
 Contest Management System
 =========================
 
+This is a fork of CMS as used in Estonian informatics olympiads. The
+`eio-specific` branch contains changes which are specific to Estonians and
+unlikely to be useful for anyone else. `eio-image` is the branch that our
+contest server Docker image is built from, it consists of the latest(ish) CMS
+from upstream, along with all the changes from `eio-specific` and our various
+unmerged feature/bugfix branches.
+
 Homepage: <http://cms-dev.github.io/>
 
 [![Build Status](https://github.com/cms-dev/cms/workflows/ci/badge.svg)](https://github.com/cms-dev/cms/actions)
