@@ -22,6 +22,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         fp-compiler
         ghc
         git
+        golang-go
         libcap-dev
         libcups2-dev
         libffi-dev

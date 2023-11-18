@@ -194,6 +194,7 @@ setup(
             "Python 3 / PyPy=cms.grading.languages.python3_pypy:Python3PyPy",
             "Rust=cms.grading.languages.rust:Rust",
             "JavaScript / Node.js=cms.grading.languages.javascript_node:JavaScriptNode",
+            "GoLang=cms.grading.languages.golang:GoLang",
         ],
     },
 )
