@@ -272,7 +272,7 @@ class ScoreTypeGroup(ScoreTypeAlone):
 {% for st in details %}
 {% set show_timing = (st["testcases"]|any("contains", "time")
                       or st["testcases"]|any("contains", "memory")) %}
-    {% if "score_fraction" in st %}
+    {% if "score_ignore" not in st and "score_fraction" in st %}
         {% if st["score_fraction"] >= 1.0 %}
 <div class="subtask correct">
         {% elif st["score_fraction"] <= 0.0 %}
@@ -287,7 +287,7 @@ class ScoreTypeGroup(ScoreTypeAlone):
         <span class="title">
             {% trans index=st["idx"] %}Subtask {{ index }}{% endtrans %}
         </span>
-    {% if "score" in st and "max_score" in st %}
+    {% if "score_ignore" not in st and "score" in st and "max_score" in st %}
         <span class="score">
             ({{ st["score"]|format_decimal }}
              / {{ st["max_score"]|format_decimal }})
