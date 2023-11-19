@@ -163,6 +163,7 @@ setup(
             "GroupMin=cms.grading.scoretypes.GroupMin:GroupMin",
             "GroupMul=cms.grading.scoretypes.GroupMul:GroupMul",
             "GroupSum=cms.grading.scoretypes.GroupSum:GroupSum",
+            "GroupSumCheck=cms.grading.scoretypes.GroupSumCheck:GroupSumCheck",
             "GroupThreshold=cms.grading.scoretypes.GroupThreshold:GroupThreshold",
         ],
         "cms.grading.languages": [
