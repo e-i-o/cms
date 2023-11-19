@@ -716,6 +716,10 @@ class YamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
                     if "score_type" not in args:
                         args["score_type"] = "GroupMin"
                     assert args["score_type"].startswith("Group")
+                    if args["score_type"] == "GroupSumCond":
+                        for st in subtasks:
+                            assert len(st) >= 3
+                            assert st[2] in ["E", "U", "C"]
                     args["score_type_parameters"] = subtasks
 
                 if "n_input" in conf:
