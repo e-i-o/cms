@@ -179,6 +179,7 @@ $(document).ready(function () {
                             </li>
     {% if actual_phase == 0 or actual_phase == 3 or participation.unrestricted %}
         {% for t_iter in contest.tasks %}
+            {% if participation.division is none or t_iter.divisions is none or participation.division in t_iter.divisions.split() %}
                             <li class="nav-header">
                                 {{ t_iter.name }}
                             </li>
@@ -188,6 +189,7 @@ $(document).ready(function () {
                             <li{% if page == "task_submissions" and task == t_iter %} class="active"{% endif %}>
                                 <a href="{{ contest_url("tasks", t_iter.name, "submissions") }}">{% trans %}Submissions{% endtrans %}</a>
                             </li>
+            {% endif %}
         {% endfor %}
     {% endif %}
                             <li class="divider"></li>

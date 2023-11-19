@@ -218,6 +218,7 @@ class ParticipationHandler(BaseHandler):
             self.get_timedelta_sec(attrs, "extra_time")
             self.get_bool(attrs, "hidden")
             self.get_bool(attrs, "unrestricted")
+            self.get_string(attrs, "division", empty=None)
 
             # Update the participation.
             participation.set_attrs(attrs)

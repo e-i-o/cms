@@ -227,6 +227,11 @@ class Task(Base):
         # this relationship.
         post_update=True)
 
+    # The divisions the task is shown to.
+    divisions = Column(
+        String,
+        nullable=True)
+
     # These one-to-many relationships are the reversed directions of
     # the ones defined in the "child" classes using foreign keys.
 
