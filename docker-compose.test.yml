@@ -21,15 +21,19 @@ services:
     volumes:
       - "./codecov:/home/cmsuser/cms/codecov"
     privileged: true
+    # disable coverage testing. it seems to be broken with our Dockerfile.
+    # possibly an issue with the new ubuntu? or with our hacky python setup
     command: >
       wait-for-it cms_test_db:5432 -- sh -c "
+      sed 's|/cmsuser:your_password_here@localhost:5432/cmsdb|/postgres@cms_test_db:5432/cmsdbfortesting|' ./config/cms.conf.sample | sudo tee /usr/local/etc/cms-testdb.conf ;
+      . venv/bin/activate ;
+      pip install -r dev-requirements.txt ;
       dropdb --host=cms_test_db --username=postgres cmsdbfortesting ;
       createdb --host=cms_test_db --username=postgres cmsdbfortesting ;
       cmsInitDB ;
-      sudo chown cmsuser:cmsuser ./codecov ;
-      pytest --cov . --cov-report xml:codecov/unittests.xml ;
+      pytest . ;
       dropdb --host=cms_test_db --username=postgres cmsdbfortesting ;
       createdb --host=cms_test_db --username=postgres cmsdbfortesting ;
       cmsInitDB ;
-      cmsRunFunctionalTests -v --coverage codecov/functionaltests.xml ;
+      cmsRunFunctionalTests -v ;
       "
