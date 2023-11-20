@@ -13,16 +13,64 @@
 
 {% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".cpp") %}
 <h3>C++</h3>
+<p><a href="https://en.cppreference.com/w/cpp">C++ reference</a></p>
+{% endif %}
 
-<p><a href="{{ url("stl", "en", "index.html") }}">{% trans %}Standard Template Library{% endtrans %}</a></p>
+{% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".py") %}
+<h3>Python</h3>
+<p><a href="http://docs.python.org/3.8/">Python documentation</a></p>
+{% endif %}
+
+{% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".c") %}
+<h3>C</h3>
+<p><a href="https://en.cppreference.com/w/c">C reference</a></p>
+{% endif %}
+
+{% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".cs") %}
+<h3>C#</h3>
+<p><a href="https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/">C# language reference</a></p>
+<p><a href="https://learn.microsoft.com/en-us/dotnet/api/?view=net-5.0">.NET API reference</a></p>
+{% endif %}
+
+{% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".go") %}
+<h3>Go</h3>
+<p><a href="https://go.dev/ref/spec">Go language specification</a></p>
+<p><a href="https://pkg.go.dev/std">Go standard library reference</a></p>
+{% endif %}
+
+{% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".hs") %}
+<h3>Haskell</h3>
+<p><a href="https://www.haskell.org/onlinereport/haskell2010/">Haskell report</a></p>
 {% endif %}
 
 {% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".java") %}
 <h3>Java</h3>
-
-<p>{% trans %}The main Java class of the solution should have exactly the same name as the task.{% endtrans %}</p>
+<p><a href="https://docs.oracle.com/javase/specs/jls/se19/html/">Java language specification</a></p>
+<p><a href="https://docs.oracle.com/en/java/javase/19/docs/api/">Java API reference</a></p>
+<p>{% trans %}The main class (the class containing the <tt>main</tt> method) must have exactly the same name (and in the same case) as the task.{% endtrans %}</p>
+<p>{% trans %}The main class must be in the default package (the source file must not contain the <tt>package</tt> keyword).{% endtrans %}</p>
 {% endif %}
 
+{% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".js") %}
+<h3>JavaScript</h3>
+<p><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference">JavaScript language reference</a></p>
+<p><a href="https://nodejs.org/docs/latest-v12.x/api/">Node.js API reference</a></p>
+{% endif %}
+
+{% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".pas") %}
+<h3>Pascal</h3>
+<p><a href="https://www.freepascal.org/docs-html/fpctoc.html">FreePascal documentation</a></p>
+{% endif %}
+
+{% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".php") %}
+<h3>PHP</h3>
+<p><a href="http://docs.php.net/manual/en/">PHP manual</a></p>
+{% endif %}
+
+{% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".rust") %}
+<h3>Rust</h3>
+<p><a href="https://doc.rust-lang.org/book/">Rust book</a></p>
+{% endif %}
 
 <h2>{% trans %}Submission details for compilation{% endtrans %}</h2>
 
