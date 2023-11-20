@@ -70,6 +70,9 @@ class Batch(TaskType):
     """
     # Codename of the checker, if it is used.
     CHECKER_CODENAME = "checker"
+    # Codename of the manager, when an interactive task is to be
+    # evaluated in a single sandbox.
+    MANAGER_CODENAME = "batchmanager"
     # Basename of the grader, used in the manager filename and as the main
     # class in languages that require us to specify it.
     GRADER_BASENAME = "grader"
@@ -292,6 +295,21 @@ class Batch(TaskType):
         for filename, digest in files_to_get.items():
             sandbox.create_file_from_storage(filename, digest)
 
+        enable_multiprocess = job.multithreaded_sandbox
+        # Special handling: if there's a batchmanager, then this is really an
+        # interactive task to be evaluated in a single sandbox.
+        # Do NOT use check_manager_present() here, as it will raise an error
+        # for normal tasks with no batchmanager.
+        if Batch.MANAGER_CODENAME in job.managers:
+            sandbox.create_file_from_storage(Batch.MANAGER_CODENAME,
+                job.managers[Batch.MANAGER_CODENAME].digest, executable=True)
+            # If there is a batchmanager, run the last command with it.
+            commands[-1][:0] = ["./%s" % Batch.MANAGER_CODENAME,
+                self.input_filename, self.output_filename]
+            # Batchmanager needs to start the solution,
+            # so always enable multiprocessing
+            enable_multiprocess = True
+
         # Actually performs the execution
         box_success, evaluation_success, stats = evaluation_step(
             sandbox,
@@ -301,7 +319,7 @@ class Batch(TaskType):
             writable_files=files_allowing_write,
             stdin_redirect=stdin_redirect,
             stdout_redirect=stdout_redirect,
-            multiprocess=job.multithreaded_sandbox)
+            multiprocess=enable_multiprocess)
 
         outcome = None
         text = None
