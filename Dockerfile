@@ -10,6 +10,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt install -y \
     libffi-dev python3.10-venv \
     php8.1-cli rustc mono-mcs haskell-platform \
     golang-go pypy3 nodejs \
+    pypy python2.7 \
     # for add-apt-repository and sudo
     software-properties-common sudo
 
