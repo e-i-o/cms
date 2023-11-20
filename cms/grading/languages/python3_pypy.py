@@ -17,27 +17,25 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Python programming language, version 3, definition."""
+"""Python3 via PyPy"""
+
 
 from cms.grading.languages.python import PythonBase
 
 
-__all__ = ["Python3CPython"]
+__all__ = ["Python3Pypy"]
 
 
-class Python3CPython(PythonBase):
-    """This defines the Python programming language, version 3 (more
-    precisely, the subversion of Python 3 available on the system)
-    using the default interpeter in the system.
-
+class Python3Pypy(PythonBase):
+    """This defines the Python 3 programming language, interpreted with the
+    system-wide PyPy3 interpreter.
     """
 
     @property
     def interpreter(self):
         """See PythonBase.interpreter."""
-        return "/usr/bin/python3"
+        return "/usr/bin/pypy3"
 
     @property
     def name(self):
-        """See Language.name."""
-        return "Python 3 / CPython"
+        return "Python 3 / PyPy"

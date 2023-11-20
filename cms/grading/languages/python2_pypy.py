@@ -17,27 +17,26 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Python programming language, version 3, definition."""
+"""Python2 via PyPy"""
 
 from cms.grading.languages.python import PythonBase
 
 
-__all__ = ["Python3CPython"]
+__all__ = ["Python2Pypy"]
 
 
-class Python3CPython(PythonBase):
-    """This defines the Python programming language, version 3 (more
-    precisely, the subversion of Python 3 available on the system)
-    using the default interpeter in the system.
-
+class Python2Pypy(PythonBase):
+    """This defines the Python 2 programming language, interpreted with the
+    sytemwide PyPy interpreter.
     """
 
     @property
     def interpreter(self):
         """See PythonBase.interpreter."""
-        return "/usr/bin/python3"
+        # the ubuntu "pypy" package installs a python2.7 pypy interpreter here.
+        # this might change, but at that point we should probably deprecate py2 altogether.
+        return "/usr/bin/pypy"
 
     @property
     def name(self):
-        """See Language.name."""
-        return "Python 3 / CPython"
+        return "Python 2 / PyPy"
