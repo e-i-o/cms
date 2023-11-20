@@ -67,7 +67,7 @@
 <p><a href="http://docs.php.net/manual/en/">PHP manual</a></p>
 {% endif %}
 
-{% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".rust") %}
+{% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".rs") %}
 <h3>Rust</h3>
 <p><a href="https://doc.rust-lang.org/book/">Rust book</a></p>
 {% endif %}
