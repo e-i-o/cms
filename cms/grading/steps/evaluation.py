@@ -67,14 +67,14 @@ EVALUATION_MESSAGES = MessageCollection([
                     "visible in the submission details might be much smaller "
                     "than the time limit.")),
     HumanMessage("signal",
-                 N_("Execution killed (could be triggered by violating memory "
-                    "limits)"),
-                 N_("The evaluation was killed by a signal. "
-                    "Among other things, this might be caused by exceeding "
-                    "the memory limit. Note that if this is the reason, "
-                    "the memory usage visible in the submission details is "
-                    "the usage before the allocation that caused the "
-                    "signal.")),
+                 N_("Execution killed by signal"),
+                 N_("The evaluation was killed by a signal. This could be "
+                    "caused by an invalid memory access, accessing arrays out "
+                    "of bounds, or other kinds of "
+                    "undefined behavior, or by exceeding the memory limit. "
+                    "Note that if this is the reason, the memory usage visible "
+                    "in the submission details is the usage before the "
+                    "allocation that caused the signal.")),
     HumanMessage("returncode",
                  N_("Execution failed because the return code was nonzero"),
                  N_("Your submission failed because it exited with a return "
