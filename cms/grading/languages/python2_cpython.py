@@ -2,6 +2,7 @@
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2016-2018 Stefano Maggiolo <s.maggiolo@gmail.com>
+# Copyright © 2019-2020 Ahto Truu <ahto.truu@ut.ee>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -18,63 +19,26 @@
 
 """Python programming language, version 2, definition."""
 
-import os
-
-from cms.grading import CompiledLanguage
+from cms.grading.languages.python import PythonBase
 
 
 __all__ = ["Python2CPython"]
 
 
-class Python2CPython(CompiledLanguage):
+class Python2CPython(PythonBase):
     """This defines the Python programming language, version 2 (more
     precisely, the subversion of Python 2 available on the system,
     usually 2.7) using the default interpeter in the system.
 
     """
 
-    MAIN_FILENAME = "__main__.pyc"
+    @property
+    def interpreter(self):
+        """See PythonBase.interpreter."""
+        # ubuntu's python2.7 package doesn't provide plain python2.
+        return "/usr/bin/python2.7"
 
     @property
     def name(self):
         """See Language.name."""
         return "Python 2 / CPython"
-
-    @property
-    def source_extensions(self):
-        """See Language.source_extensions."""
-        return [".py"]
-
-    @property
-    def executable_extension(self):
-        """See Language.executable_extension."""
-        return ".zip"
-
-    def get_compilation_commands(self,
-                                 source_filenames, executable_filename,
-                                 for_evaluation=True):
-        """See Language.get_compilation_commands."""
-
-        commands = []
-        files_to_package = []
-        commands.append(["/usr/bin/python2", "-m", "compileall", "."])
-        for idx, source_filename in enumerate(source_filenames):
-            basename = os.path.splitext(os.path.basename(source_filename))[0]
-            pyc_filename = "%s.pyc" % basename
-            # The file with the entry point must be in first position.
-            if idx == 0:
-                commands.append(["/bin/mv", pyc_filename, self.MAIN_FILENAME])
-                files_to_package.append(self.MAIN_FILENAME)
-            else:
-                files_to_package.append(pyc_filename)
-
-        commands.append(["/usr/bin/zip", executable_filename]
-                        + files_to_package)
-
-        return commands
-
-    def get_evaluation_commands(
-            self, executable_filename, main=None, args=None):
-        """See Language.get_evaluation_commands."""
-        args = args if args is not None else []
-        return [["/usr/bin/python2", executable_filename] + args]
