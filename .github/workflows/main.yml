@@ -24,13 +24,3 @@ jobs:
       - name: Run tests
         run: |
           docker-compose -f docker-compose.test.yml run --rm cms_test
-
-      - uses: codecov/codecov-action@v3
-        with:
-          files: ./codecov/unittests.xml
-          flags: unittests
-
-      - uses: codecov/codecov-action@v3
-        with:
-          files: ./codecov/functionaltests.xml
-          flags: functionaltests

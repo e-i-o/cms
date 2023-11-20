@@ -12,7 +12,9 @@ RUN DEBIAN_FRONTEND=noninteractive apt install -y \
     golang-go pypy3 nodejs \
     pypy python2.7 \
     # for add-apt-repository and sudo
-    software-properties-common sudo
+    software-properties-common sudo \
+    # for cms unit tests
+    wait-for-it
 
 # we want a newer ubuntu to get newer versions of compilers.
 # however, CMS targets ubuntu 20.04, with python 3.8. So pull that in manually
