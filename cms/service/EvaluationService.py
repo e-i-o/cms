@@ -298,10 +298,11 @@ class EvaluationService(TriggeredService):
                          .total_seconds(),
                          immediately=False)
 
-    def submission_enqueue_operations(self, submission):
+    def submission_enqueue_operations(self, submission, archive_sandbox=False):
         """Push in queue the operations required by a submission.
 
         submission (Submission): a submission.
+        archive_sandbox (boolean): whether to archive the sandbox.
 
         return (int): the number of actually enqueued operations.
 
@@ -311,7 +312,7 @@ class EvaluationService(TriggeredService):
             submission_result = submission.get_result(dataset)
             number_of_operations = 0
             for operation, priority, timestamp in submission_get_operations(
-                    submission_result, submission, dataset):
+                    submission_result, submission, dataset, archive_sandbox):
                 number_of_operations += 1
                 if self.enqueue(operation, priority, timestamp):
                     new_operations += 1
@@ -497,12 +498,12 @@ class EvaluationService(TriggeredService):
         # evaluations for the same submission and dataset).
         by_object_and_type = defaultdict(list)
         for operation, result in items:
-            t = (operation.type_, operation.object_id, operation.dataset_id)
+            t = (operation.type_, operation.object_id, operation.dataset_id, operation.archive_sandbox)
             by_object_and_type[t].append((operation, result))
 
         with SessionGen() as session:
             for key, operation_results in by_object_and_type.items():
-                type_, object_id, dataset_id = key
+                type_, object_id, dataset_id, archive_sandbox = key
 
                 dataset = Dataset.get_from_id(dataset_id, session)
                 if dataset is None:
@@ -533,7 +534,7 @@ class EvaluationService(TriggeredService):
             session.commit()
 
             num_testcases_per_dataset = dict()
-            for type_, object_id, dataset_id in by_object_and_type.keys():
+            for type_, object_id, dataset_id, archive_sandbox in by_object_and_type.keys():
                 if type_ == ESOperation.EVALUATION:
                     if dataset_id not in num_testcases_per_dataset:
                         num_testcases_per_dataset[dataset_id] = session\
@@ -553,16 +554,16 @@ class EvaluationService(TriggeredService):
 
             logger.info("Ending operations for %s objects...",
                         len(by_object_and_type))
-            for type_, object_id, dataset_id in by_object_and_type.keys():
+            for type_, object_id, dataset_id, archive_sandbox in by_object_and_type.keys():
                 if type_ == ESOperation.COMPILATION:
                     submission_result = SubmissionResult.get_from_id(
                         (object_id, dataset_id), session)
-                    self.compilation_ended(submission_result)
+                    self.compilation_ended(submission_result, archive_sandbox)
                 elif type_ == ESOperation.EVALUATION:
                     submission_result = SubmissionResult.get_from_id(
                         (object_id, dataset_id), session)
                     if submission_result.evaluated():
-                        self.evaluation_ended(submission_result)
+                        self.evaluation_ended(submission_result, archive_sandbox)
                 elif type_ == ESOperation.USER_TEST_COMPILATION:
                     user_test_result = UserTestResult.get_from_id(
                         (object_id, dataset_id), session)
@@ -658,7 +659,7 @@ class EvaluationService(TriggeredService):
         else:
             logger.error("Invalid operation type %r.", operation.type_)
 
-    def compilation_ended(self, submission_result):
+    def compilation_ended(self, submission_result, archive_sandbox):
         """Actions to be performed when we have a submission that has
         ended compilation. In particular: we queue evaluation if
         compilation was ok, we inform ScoringService if the
@@ -708,7 +709,7 @@ class EvaluationService(TriggeredService):
         # Enqueue next steps to be done
         self.submission_enqueue_operations(submission)
 
-    def evaluation_ended(self, submission_result):
+    def evaluation_ended(self, submission_result, archive_sandbox=False):
         """Actions to be performed when we have a submission that has
         been evaluated. In particular: we inform ScoringService on
         success, we requeue on failure.
@@ -744,7 +745,7 @@ class EvaluationService(TriggeredService):
                              submission_result.dataset_id)
 
         # Enqueue next steps to be done (e.g., if evaluation failed).
-        self.submission_enqueue_operations(submission)
+        self.submission_enqueue_operations(submission, archive_sandbox)
 
     def user_test_compilation_ended(self, user_test_result):
         """Actions to be performed when we have a user test that has
@@ -869,10 +870,12 @@ class EvaluationService(TriggeredService):
                               contest_id=None,
                               submission_id=None,
                               dataset_id=None,
+                              testcase_id=None,
                               participation_id=None,
                               task_id=None,
                               language=None,
-                              level="compilation",):
+                              level="compilation",
+                              archive_sandbox=False):
         """Request to invalidate some computed data.
 
         Invalidate the compilation and/or evaluation data of the
@@ -898,6 +901,7 @@ class EvaluationService(TriggeredService):
             invalidate, or None.
         task_id (int|None): id of the task to invalidate, or None.
         level (string): 'compilation' or 'evaluation'
+        archive_sandbox (boolean): whether to store submission output.
 
         """
         logger.info("Invalidation request received.")
@@ -966,12 +970,12 @@ class EvaluationService(TriggeredService):
                 if level == "compilation":
                     submission_result.invalidate_compilation()
                 elif level == "evaluation":
-                    submission_result.invalidate_evaluation()
+                    submission_result.invalidate_evaluation(testcase_id=testcase_id)
 
             # Finally, we re-enqueue the operations for the
             # submissions.
             for submission in submissions:
-                self.submission_enqueue_operations(submission)
+                self.submission_enqueue_operations(submission, archive_sandbox)
 
             session.commit()
         logger.info("Invalidate successfully completed.")

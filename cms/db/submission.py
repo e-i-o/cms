@@ -335,6 +335,10 @@ class SubmissionResult(Base):
     compilation_sandbox = Column(
         Unicode,
         nullable=True)
+    compilation_sandbox_digests = Column(
+        ARRAY(String),
+        nullable=True
+    )
 
     # Evaluation outcome (can be None = yet to evaluate, "ok" =
     # evaluation successful). At any time, this should be equal to
@@ -562,16 +566,22 @@ class SubmissionResult(Base):
         self.compilation_memory = None
         self.compilation_shard = None
         self.compilation_sandbox = None
+        self.compilation_sandbox_digests = []
         self.executables = {}
 
-    def invalidate_evaluation(self):
+    def invalidate_evaluation(self, testcase_id=None):
         """Blank the evaluation outcomes and the score.
+
+        testcase_id (int|None): ID of testcase to invalidate, or None to invalidate all.
 
         """
         self.invalidate_score()
         self.evaluation_outcome = None
         self.evaluation_tries = 0
-        self.evaluations = []
+        if testcase_id:
+            self.evaluations = [e for e in self.evaluations if e.testcase_id != testcase_id]
+        else:
+            self.evaluations = []
 
     def invalidate_score(self):
         """Blank the score.
@@ -745,6 +755,10 @@ class Evaluation(Base):
     evaluation_sandbox = Column(
         Unicode,
         nullable=True)
+    evaluation_sandbox_digests = Column(
+        ARRAY(String),
+        nullable=True
+    )
 
     @property
     def codename(self):
