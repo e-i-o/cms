@@ -457,10 +457,10 @@ msgid "Questions"
 msgstr "Küsimused"
 
 msgid "Subject"
-msgstr "Teema"
+msgstr "Pealkiri"
 
 msgid "Text"
-msgstr "Tekst"
+msgstr "Sisu"
 
 msgid "Ask question"
 msgstr "Esita küsimus"
@@ -759,7 +759,7 @@ msgid "Start!"
 msgstr "Alusta!"
 
 msgid "Task overview"
-msgstr "Ülesande info"
+msgstr "Ülesannete ülevaade"
 
 msgid "Task"
 msgstr "Ülesanne"
