@@ -32,6 +32,7 @@ import ipaddress
 import json
 import logging
 import re
+import hashlib
 
 try:
     import tornado4.web as tornado_web
@@ -239,6 +240,9 @@ class LoginHandler(ContestHandler):
         if participation is None:
             self.redirect(error_page)
         else:
+            # hack to give nginx something nice to load-balance with
+            shard_id = ("shardhash" + self.contest.name + username).encode()
+            self.set_cookie("cms_shard_hash", hashlib.md5(shard_id).hexdigest(), expires_days=365)
             self.redirect(next_page)
 
 
