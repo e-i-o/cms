@@ -207,6 +207,7 @@
     <tbody>
 {% set extensions = "[%s]"|format(contest.languages|map("to_language")|map(attribute="source_extension")|unique|join("|")) %}
 {% for t_iter in contest.tasks %}
+    {% if participation.division is none or t_iter.divisions is none or participation.division in t_iter.divisions.split() %}
         <tr>
             <th>{{ t_iter.name }}</th>
             <td>{{ t_iter.title }}</td>
@@ -236,6 +237,7 @@
             </td>
     {% endif %}
         </tr>
+    {% endif %}
 {% endfor %}
     </tbody>
 </table>
