@@ -27,6 +27,9 @@ RUN useradd -ms /bin/bash cmsuser && \
     usermod -aG sudo cmsuser
 # Disable sudo password
 RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+# HACK to allow the eio user to access the right files in our server setup
+RUN groupadd -g 1001 eiogroup && \
+    usermod -aG eiogroup cmsuser
 # Set cmsuser as default user
 USER cmsuser
 
