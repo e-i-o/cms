@@ -380,11 +380,13 @@ class EstYamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
         args["submission_format"] = ["%s.%%l" % name]
 
         # Import the feedback level when explicitly set to full
-        # (default behaviour is restricted)
         if conf.get("feedback_level", None) == FEEDBACK_LEVEL_FULL:
             args["feedback_level"] = FEEDBACK_LEVEL_FULL
         elif conf.get("feedback_level", None) == FEEDBACK_LEVEL_RESTRICTED:
             args["feedback_level"] = FEEDBACK_LEVEL_RESTRICTED
+        else:
+            # default to full feedback
+            args["feedback_level"] = FEEDBACK_LEVEL_FULL
 
         if conf.get("score_mode", None) == SCORE_MODE_MAX:
             args["score_mode"] = SCORE_MODE_MAX
@@ -392,6 +394,9 @@ class EstYamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
             args["score_mode"] = SCORE_MODE_MAX_SUBTASK
         elif conf.get("score_mode", None) == SCORE_MODE_MAX_TOKENED_LAST:
             args["score_mode"] = SCORE_MODE_MAX_TOKENED_LAST
+        else:
+            # default to max-subtask
+            args["score_mode"] = SCORE_MODE_MAX_SUBTASK
 
         # Use the new token settings format if detected.
         if "token_mode" in conf:

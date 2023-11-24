@@ -294,6 +294,8 @@ class ContestImporter:
             args["ip"] = list(map(ipaddress.ip_network, new_p["ip"].split(",")))
         if "password" in new_p:
             args["password"] = new_p["password"]
+        if "division" in new_p:
+            args["division"] = new_p["division"]
 
         new_p = Participation(**args)
         session.add(new_p)
