@@ -9,7 +9,9 @@ services:
 
   cms_test:
     container_name: cms_test
-    build: .
+    build:
+      context: .
+      target: worker
     depends_on:
       - "cms_test_db"
     environment:
