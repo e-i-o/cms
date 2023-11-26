@@ -54,6 +54,7 @@ RUN sudo apt update && sudo apt install -y \
     fp-compiler openjdk-19-jdk-headless \
     php8.1-cli rustc mono-mcs haskell-platform \
     golang-go pypy3 nodejs \
+    pypy python2.7 \
     && sudo rm -rf /var/lib/apt/lists/*
 
 COPY --chown=cmsuser:cmsuser . .
