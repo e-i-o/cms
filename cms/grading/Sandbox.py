@@ -24,6 +24,7 @@ import logging
 import os
 import resource
 import select
+import shutil
 import stat
 import tempfile
 import time
@@ -529,7 +530,7 @@ class SandboxBase(metaclass=ABCMeta):
 
         # Archive the working directory
         sandbox_archive_filename = "sandbox.zip"
-        sandbox_archive = self.relative_path(sandbox_archive_filename)
+        sandbox_archive = os.path.join(self.get_root_path(), sandbox_archive_filename)
         content_path = self.get_root_path()
         with zipfile.ZipFile(sandbox_archive, "w") as zip_file:
             for root, dirs, files in os.walk(content_path):
@@ -893,6 +894,7 @@ class IsolateSandbox(SandboxBase):
         else:
             box_id = IsolateSandbox.next_id % 10
         IsolateSandbox.next_id += 1
+        self.box_id = box_id
 
         # We create a directory "home" inside the outer temporary directory,
         # that will be bind-mounted to "/tmp" inside the sandbox (some
@@ -903,10 +905,6 @@ class IsolateSandbox(SandboxBase):
         # outer directory exists with no read permissions.
         self._outer_dir = tempfile.mkdtemp(dir=self.temp_dir,
                                            prefix="cms-%s-" % (self.name))
-        self._home = os.path.join(self._outer_dir, "home")
-        self._home_dest = "/tmp"
-        os.mkdir(self._home)
-        self.allow_writing_all()
 
         self.exec_name = 'isolate'
         self.box_exec = self.detect_box_executable()
@@ -916,12 +914,21 @@ class IsolateSandbox(SandboxBase):
         self.log = None
         self.exec_num = -1
         self.cmd_file = os.path.join(self._outer_dir, "commands.log")
+        self.cgroup = config.use_cgroups
+
+        # Tell isolate to get the sandbox ready. We do our best to cleanup
+        # after ourselves, but we might have missed something if a previous
+        # worker was interrupted in the middle of an execution, so we issue an
+        # idempotent cleanup.
+        self.cleanup(initial=True)
+        self._home = os.path.join(self.initialize_isolate(), "box")
+        self._home_dest = "/box"
+        self.allow_writing_all()
+
         logger.debug("Sandbox in `%s' created, using box `%s'.",
                      self._home, self.box_exec)
 
         # Default parameters for isolate
-        self.box_id = box_id           # -b
-        self.cgroup = config.use_cgroups  # --cg
         self.chdir = self._home_dest   # -c
         self.dirs = []                 # -d
         self.preserve_env = False      # -e
@@ -938,9 +945,6 @@ class IsolateSandbox(SandboxBase):
         self.wallclock_timeout = None  # -w
         self.extra_timeout = None      # -x
 
-        self.add_mapped_directory(
-            self._home, dest=self._home_dest, options="rw")
-
         # Set common environment variables.
         # Specifically needed by Python, that searches the home for
         # packages.
@@ -954,13 +958,6 @@ class IsolateSandbox(SandboxBase):
         # /etc/mono/config to obtain the default DllMap, which includes, in
         # particular, the System.Native assembly.
         self.maybe_add_mapped_directory("/etc/mono", options="noexec")
-
-        # Tell isolate to get the sandbox ready. We do our best to cleanup
-        # after ourselves, but we might have missed something if a previous
-        # worker was interrupted in the middle of an execution, so we issue an
-        # idempotent cleanup.
-        self.cleanup()
-        self.initialize_isolate()
 
     def add_mapped_directory(self, src, dest=None, options=None,
                              ignore_if_not_existing=False):
@@ -989,6 +986,7 @@ class IsolateSandbox(SandboxBase):
         """Set permissions in such a way that any operation is allowed.
 
         """
+        return
         os.chmod(self._home, 0o777)
         for filename in os.listdir(self._home):
             os.chmod(os.path.join(self._home, filename), 0o777)
@@ -997,6 +995,7 @@ class IsolateSandbox(SandboxBase):
         """Set permissions in such a way that the user cannot write anything.
 
         """
+        return
         os.chmod(self._home, 0o755)
         for filename in os.listdir(self._home):
             os.chmod(os.path.join(self._home, filename), 0o755)
@@ -1016,6 +1015,7 @@ class IsolateSandbox(SandboxBase):
             outside the home directory are ignored.
 
         """
+        return
         outer_paths = []
         for inner_path in inner_paths:
             abs_inner_path = \
@@ -1435,12 +1435,13 @@ class IsolateSandbox(SandboxBase):
             + (["--cg"] if self.cgroup else [])
             + ["--box-id=%d" % self.box_id, "--init"])
         try:
-            subprocess.check_call(init_cmd)
+            return subprocess.run(init_cmd, check=True,
+                        capture_output=True, encoding="utf-8").stdout.strip()
         except subprocess.CalledProcessError as e:
             raise SandboxInterfaceException(
                 "Failed to initialize sandbox") from e
 
-    def cleanup(self, delete=False):
+    def cleanup(self, delete=False, initial=False):
         """See Sandbox.cleanup()."""
         # The user isolate assigns within the sandbox might have created
         # subdirectories and files therein, making the user outside the sandbox
@@ -1453,14 +1454,14 @@ class IsolateSandbox(SandboxBase):
             + (["--cg"] if self.cgroup else []) \
             + ["--box-id=%d" % self.box_id]
 
-        if delete:
-            # Ignore exit status as some files may be owned by our user
-            subprocess.call(
-                exe + [
-                    "--dir=%s=%s:rw" % (self._home_dest, self._home),
-                    "--run", "--",
-                    "/bin/chmod", "777", "-R", self._home_dest],
-                stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+        if not initial and not delete:
+            # cleanup() called in order to actually remove the sandbox,
+            # but we want to keep its /box dir.
+            # so copy it out separately
+            # If our home doesn't exist anymore, silently ignore it as
+            # cleanup() should be idempotent
+            if os.path.exists(self._home):
+                shutil.copytree(self._home, os.path.join(self._outer_dir, "box"))
 
         # Tell isolate to cleanup the sandbox.
         subprocess.check_call(
