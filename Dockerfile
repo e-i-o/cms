@@ -51,11 +51,15 @@ RUN venv/bin/python setup.py install
 FROM common AS worker
 
 RUN sudo apt update && sudo apt install -y \
-    fp-compiler openjdk-19-jdk-headless \
+    openjdk-19-jdk-headless \
     php8.1-cli rustc mono-mcs haskell-platform \
-    golang-go pypy3 nodejs \
-    pypy python2.7 \
+    golang-go nodejs \
     && sudo rm -rf /var/lib/apt/lists/*
+
+RUN curl https://downloads.python.org/pypy/pypy3.10-v7.3.13-linux64.tar.bz2 -o /tmp/pypy.tar.bz2 && \
+    sudo tar -xf /tmp/pypy.tar.bz2 -C /opt && \
+    rm /tmp/pypy.tar.bz2 && \
+    sudo ln -s /opt/pypy3.10-v7.3.13-linux64 /opt/pypy3
 
 COPY --chown=cmsuser:cmsuser . .
 RUN sudo python3.8 prerequisites.py --yes --cmsuser=cmsuser install

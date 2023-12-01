@@ -27,14 +27,14 @@ __all__ = ["Python3Pypy"]
 
 
 class Python3Pypy(PythonBase):
-    """This defines the Python 3 programming language, interpreted with the
-    system-wide PyPy3 interpreter.
+    """This defines the Python 3 programming language, interpreted with
+    a PyPy installed into /opt/pypy3.
     """
 
     @property
     def interpreter(self):
         """See PythonBase.interpreter."""
-        return "/usr/bin/pypy3"
+        return "/opt/pypy3/bin/pypy3"
 
     @property
     def name(self):
