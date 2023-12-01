@@ -6,7 +6,14 @@ This is a fork of CMS as used in Estonian informatics olympiads. The
 unlikely to be useful for anyone else. `eio-image` is the branch that our
 contest server Docker image is built from, it consists of the latest(ish) CMS
 from upstream, along with all the changes from `eio-specific` and our various
-unmerged feature/bugfix branches.
+unmerged feature/bugfix branches (and also some changes which really belong in
+`eio-specific` but which affect multiple unmerged feature branches at once...)
+
+Docker build commands:
+```
+docker build -t eeio/cms-worker --target worker .
+docker build -t eeio/cms --target base .
+```
 
 Homepage: <http://cms-dev.github.io/>
 

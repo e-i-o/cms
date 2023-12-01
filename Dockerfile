@@ -47,7 +47,8 @@ COPY --chown=cmsuser:cmsuser . .
 RUN sudo python3.8 prerequisites.py --yes --cmsuser=cmsuser install
 RUN venv/bin/python setup.py install
 
-# this doesn't use `base` because we don't want to reinstall all the compilers when rebuilding CMS
+# this doesn't use `FROM base AS worker` because that would cause all compilers
+# to be reinstalled (which takes forever) any time CMS code changes.
 FROM common AS worker
 
 RUN sudo apt update && sudo apt install -y \
