@@ -18,7 +18,7 @@
 
 {% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".py") %}
 <h3>Python</h3>
-<p><a href="http://docs.python.org/3.8/">Python documentation</a></p>
+<p><a href="http://docs.python.org/3.10/">Python documentation</a></p>
 {% endif %}
 
 {% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".c") %}
