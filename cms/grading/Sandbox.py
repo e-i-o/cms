@@ -950,6 +950,9 @@ class IsolateSandbox(SandboxBase):
         # symlink to one out of many alternatives.
         self.maybe_add_mapped_directory("/etc/alternatives")
 
+        # PyPy install location
+        self.maybe_add_mapped_directory("/opt")
+
         # Likewise, needed by C# programs. The Mono runtime looks in
         # /etc/mono/config to obtain the default DllMap, which includes, in
         # particular, the System.Native assembly.
