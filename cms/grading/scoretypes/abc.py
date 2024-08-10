@@ -35,6 +35,8 @@ import re
 from abc import ABCMeta, abstractmethod
 
 from cms import FEEDBACK_LEVEL_RESTRICTED
+from cms.grading.languagemanager import get_language
+from cms.grading.steps import EVALUATION_MESSAGES
 from cms.locale import DEFAULT_TRANSLATION
 from cms.server.jinja2_toolbox import GLOBAL_ENVIRONMENT
 
@@ -274,7 +276,9 @@ class ScoreTypeGroup(ScoreTypeAlone):
                     </td>
             {% if feedback_level == FEEDBACK_LEVEL_FULL %}
                     <td class="execution-time">
-                {% if "time" in tc and tc["time"] is not none %}
+                {% if "time_override" in tc and tc["time_override"] is not none %}
+                        &gt; {{ tc["time_override"]|format_duration }}
+                {% elif "time" in tc and tc["time"] is not none %}
                         {{ tc["time"]|format_duration }}
                 {% else %}
                         {% trans %}N/A{% endtrans %}
@@ -387,6 +391,13 @@ class ScoreTypeGroup(ScoreTypeAlone):
         targets = self.retrieve_target_testcases()
         evaluations = {ev.codename: ev for ev in submission_result.evaluations}
 
+        submission_lang = submission_result.submission.language
+        submission_is_interpreted = False
+        if submission_lang is not None:
+            lang = get_language(submission_lang)
+            if lang.is_interpreted:
+                submission_is_interpreted = True
+
         for st_idx, parameter in enumerate(self.parameters):
             target = targets[st_idx]
 
@@ -397,11 +408,19 @@ class ScoreTypeGroup(ScoreTypeAlone):
                 tc_outcome = self.get_public_outcome(
                     float(evaluations[tc_idx].outcome), parameter)
 
+                time_override = None
+                if evaluations[tc_idx].text == [EVALUATION_MESSAGES.get("timeout").message]:
+                    dataset = evaluations[tc_idx].dataset
+                    time_override = dataset.time_limit
+                    if submission_is_interpreted and dataset.time_limit_interpreted is not None:
+                        time_override = dataset.time_limit_interpreted
+
                 testcases.append({
                     "idx": tc_idx,
                     "outcome": tc_outcome,
                     "text": evaluations[tc_idx].text,
                     "time": evaluations[tc_idx].execution_time,
+                    "time_override": time_override,
                     "memory": evaluations[tc_idx].execution_memory,
                     "show_in_restricted_feedback": previous_tc_all_correct})
                 if self.public_testcases[tc_idx]:
