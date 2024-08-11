@@ -36,7 +36,7 @@ from abc import ABCMeta, abstractmethod
 
 from cms import FEEDBACK_LEVEL_RESTRICTED
 from cms.grading.languagemanager import get_language
-from cms.grading.steps import EVALUATION_MESSAGES
+from cms.grading.steps import EVALUATION_MESSAGES, COMPILATION_MESSAGES
 from cms.locale import DEFAULT_TRANSLATION
 from cms.server.jinja2_toolbox import GLOBAL_ENVIRONMENT
 
@@ -273,6 +273,9 @@ class ScoreTypeGroup(ScoreTypeAlone):
                     <td class="outcome">{{ _(tc["outcome"]) }}</td>
                     <td class="details">
                       {{ tc["text"]|format_status_text }}
+                      {% if tc["help"] is not none %}
+                        <i class="icon-question-sign" title="{{ _(tc["help"]) }}"></i>
+                      {% endif %}
                     </td>
             {% if feedback_level == FEEDBACK_LEVEL_FULL %}
                     <td class="execution-time">
@@ -415,10 +418,22 @@ class ScoreTypeGroup(ScoreTypeAlone):
                     if submission_is_interpreted and dataset.time_limit_interpreted is not None:
                         time_override = dataset.time_limit_interpreted
 
+                message_text = evaluations[tc_idx].text
+                helptext = None
+                # this is a hack, but the alternative requires threading the
+                # message ID through like 7 different functions, and that
+                # didn't feel particularly pleasant either.
+                for msg in EVALUATION_MESSAGES.all() + COMPILATION_MESSAGES.all():
+                    if message_text is not None and message_text[0:1] == [msg.message]:
+                        if msg.inline_help:
+                            helptext = msg.help_text
+                        break
+
                 testcases.append({
                     "idx": tc_idx,
                     "outcome": tc_outcome,
                     "text": evaluations[tc_idx].text,
+                    "help": helptext,
                     "time": evaluations[tc_idx].execution_time,
                     "time_override": time_override,
                     "memory": evaluations[tc_idx].execution_memory,

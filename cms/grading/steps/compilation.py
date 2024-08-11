@@ -53,14 +53,16 @@ COMPILATION_MESSAGES = MessageCollection([
                  N_("Compilation timed out"),
                  N_("Your submission exceeded the time limit while compiling. "
                     "This might be caused by an excessive use of C++ "
-                    "templates, for example.")),
+                    "templates, for example."),
+                 inline_help=True),
     HumanMessage("signal",
                  N_("Compilation killed with signal %s (could be triggered "
                     "by violating memory limits)"),
                  N_("Your submission was killed with the specified signal. "
                     "Among other things, this might be caused by exceeding "
                     "the memory limit for the compilation, and in turn by an "
-                    "excessive use of C++ templates, for example.")),
+                    "excessive use of C++ templates, for example."),
+                 inline_help=True),
 ])
 
 
