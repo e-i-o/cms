@@ -58,6 +58,10 @@ def execution_stats(sandbox, collect_output=False):
 
     return stats
 
+def safe_combine_stat(a, b, op):
+    if a is None: return b
+    if b is None: return a
+    return op(a, b)
 
 def merge_execution_stats(first_stats, second_stats, concurrent=True):
     """Merge two execution statistics dictionary.
@@ -90,18 +94,28 @@ def merge_execution_stats(first_stats, second_stats, concurrent=True):
         return second_stats.copy()
 
     ret = first_stats.copy()
-    ret["execution_time"] += second_stats["execution_time"]
+    ret["execution_time"] = safe_combine_stat(ret["execution_time"],
+                                              second_stats["execution_time"],
+                                              lambda a,b: a+b)
 
     if concurrent:
-        ret["execution_wall_clock_time"] = max(
+        ret["execution_wall_clock_time"] = safe_combine_stat(
             ret["execution_wall_clock_time"],
-            second_stats["execution_wall_clock_time"])
-        ret["execution_memory"] += second_stats["execution_memory"]
+            second_stats["execution_wall_clock_time"],
+            max)
+        ret["execution_memory"] = safe_combine_stat(
+            ret["execution_memory"],
+            second_stats["execution_memory"],
+            lambda a,b: a+b)
     else:
-        ret["execution_wall_clock_time"] += \
-            second_stats["execution_wall_clock_time"]
-        ret["execution_memory"] = max(ret["execution_memory"],
-                                      second_stats["execution_memory"])
+        ret["execution_wall_clock_time"] = safe_combine_stat(
+            ret["execution_wall_clock_time"],
+            second_stats["execution_wall_clock_time"],
+            lambda a,b: a+b)
+        ret["execution_memory"] = safe_combine_stat(
+            ret["execution_memory"],
+            second_stats["execution_memory"],
+            max)
 
     if first_stats["exit_status"] == Sandbox.EXIT_OK:
         ret["exit_status"] = second_stats["exit_status"]
