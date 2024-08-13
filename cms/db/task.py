@@ -249,6 +249,13 @@ class Task(Base):
         passive_deletes=True,
         back_populates="task")
 
+    solution_templates = relationship(
+        "SolutionTemplate",
+        collection_class=attribute_mapped_collection("language"),
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="task")
+
     datasets = relationship(
         "Dataset",
         # Due to active_dataset_id, SQLAlchemy cannot unambiguously
@@ -345,6 +352,41 @@ class Attachment(Base):
         Digest,
         nullable=False)
 
+class SolutionTemplate(Base):
+    """Class to store solution templates to give to the user together
+    with the statement of the task.
+
+    """
+    __tablename__ = 'solution_templates'
+    __table_args__ = (
+        UniqueConstraint('task_id', 'language'),
+    )
+
+    # Auto increment primary key.
+    id = Column(
+        Integer,
+        primary_key=True)
+
+    # Task (id and object) owning the template.
+    task_id = Column(
+        Integer,
+        ForeignKey(Task.id,
+                   onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+        index=True)
+    task = relationship(
+        Task,
+        back_populates="solution_templates")
+
+    # The programming language this template is for.
+    language = Column(
+        String,
+        nullable=False)
+
+    # The text of this template.
+    content = Column(
+        Unicode,
+        nullable=False)
 
 class Dataset(Base):
     """Class to store the information about a data set.
