@@ -82,7 +82,8 @@ EVALUATION_MESSAGES = MessageCollection([
     HumanMessage("returncode",
                  N_("Runtime error (return code was nonzero)"),
                  N_("Your submission failed because it exited with a return "
-                    "code different from 0."),
+                    "code different from 0. Among others, a possible cause is "
+                    "your program being terminated by an unhandled exception."),
                  inline_help=True),
 ])
 

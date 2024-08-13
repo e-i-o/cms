@@ -139,7 +139,10 @@ msgstr ""
 msgid "Runtime error (return code was nonzero)"
 msgstr ""
 
-msgid "Your submission failed because it exited with a return code different from 0."
+msgid ""
+"Your submission failed because it exited with a return "
+"code different from 0. Among others, a possible cause is "
+"your program being terminated by an unhandled exception."
 msgstr ""
 
 msgid "Execution completed successfully"
