@@ -978,6 +978,20 @@ msgstr "<b>%(lang)s</b>"
 msgid "%(lang)s"
 msgstr "%(lang)s"
 
+msgid "Solution template"
+msgstr "Lahenduse mall"
+
+msgid ""
+"You may use the template below as a starting point for your solution. You "
+"may change anything in this template. You may also completely ignore it if "
+"you want to read input or format output in some other way or structure your "
+"solution differently."
+msgstr ""
+"Järgnevat malli võib kasutada oma lahenduse põhjana. Selles mallis võib "
+"kõike muuta. Malli kasutamine pole ka üldse kohustuslik, kui tahad sisendi "
+"lugemise või väljundi vormistamise teisiti teha või oma lahenduse hoopis "
+"muudmoodi üles ehitada."
+
 msgid "Some details"
 msgstr "Üksikasjad"
 

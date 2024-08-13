@@ -109,7 +109,7 @@ $(document).ready(update_solution_template);
     {% endif %}
   </h2>
 
-  {% trans %}Blah blah selgitav jutuke{% endtrans %}
+  {% trans %}You may use the template below as a starting point for your solution. You may change anything in this template. You may also completely ignore it if you want to read input or format output in some other way or structure your solution differently.{% endtrans %}
 
   {% for template in task.solution_templates.values()|sort(attribute="language") %}
     <pre class="sol-templates hidden" id="sol-template-{{ template.language }}">{{ template.content }}</pre>
