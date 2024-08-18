@@ -34,6 +34,7 @@ try:
 except ImportError:
     import tornado.web as tornado_web
 
+from cms.db.task import SolutionTemplate
 from cms.db import Attachment, Dataset, Session, Statement, Submission, Task
 from cmscommon.datetime import make_datetime
 from .base import BaseHandler, SimpleHandler, require_permission
@@ -169,6 +170,9 @@ class TaskHandler(BaseHandler):
                 make_datetime(), "Invalid field(s)", repr(error))
             self.redirect(self.url("task", task_id))
             return
+
+        for sol_template in task.solution_templates.values():
+            sol_template.content = self.get_argument(f"solution_template_{sol_template.id}", "")
 
         for dataset in task.datasets:
             try:
@@ -509,3 +513,54 @@ class RemoveTaskHandler(BaseHandler):
 
         # Maybe they'll want to do this again (for another task)
         self.write("../../tasks")
+
+class AddSolutionTemplateHandler(BaseHandler):
+    """Add an solution template to a task.
+
+    """
+    @require_permission(BaseHandler.PERMISSION_ALL)
+    def get(self, task_id):
+        task = self.safe_get_item(Task, task_id)
+        self.contest = task.contest
+
+        self.r_params = self.render_params()
+        self.r_params["task"] = task
+        self.render("add_sol_template.html", **self.r_params)
+
+    @require_permission(BaseHandler.PERMISSION_ALL)
+    def post(self, task_id):
+        fallback_page = self.url("task", task_id, "sol_templates", "add")
+
+        task = self.safe_get_item(Task, task_id)
+
+        attrs = {}
+        self.get_string(attrs, "language")
+        self.get_string(attrs, "content")
+
+        templ = SolutionTemplate(**attrs, task=task)
+        self.sql_session.add(templ)
+
+        if self.try_commit():
+            self.redirect(self.url("task", task_id))
+        else:
+            self.redirect(fallback_page)
+
+class SolutionTemplateHandler(BaseHandler):
+    """Delete a solution template.
+
+    """
+
+    @require_permission(BaseHandler.PERMISSION_ALL)
+    def delete(self, task_id, sol_template_id):
+        sol_template = self.safe_get_item(SolutionTemplate, sol_template_id)
+        task = self.safe_get_item(Task, task_id)
+
+        # Protect against URLs providing incompatible parameters.
+        if sol_template.task is not task:
+            raise tornado_web.HTTPError(404)
+
+        self.sql_session.delete(sol_template)
+        self.try_commit()
+
+        # Page to redirect to.
+        self.write("%s" % task.id)

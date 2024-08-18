@@ -80,6 +80,8 @@ from .submission import \
     SubmissionOfficialStatusHandler, \
     SubmissionFileHandler
 from .task import \
+    AddSolutionTemplateHandler, \
+    SolutionTemplateHandler, \
     AddTaskHandler, \
     TaskHandler, \
     AddDatasetHandler, \
@@ -171,6 +173,9 @@ HANDLERS = [
     (r"/task/([0-9]+)/statement/([0-9]+)", StatementHandler),
     (r"/task/([0-9]+)/attachments/add", AddAttachmentHandler),
     (r"/task/([0-9]+)/attachment/([0-9]+)", AttachmentHandler),
+    (r"/task/([0-9]+)/sol_templates/add", AddSolutionTemplateHandler),
+    (r"/task/([0-9]+)/sol_template/([0-9]+)", SolutionTemplateHandler),
+
 
     # Datasets
 
