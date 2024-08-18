@@ -236,17 +236,14 @@ class AddDivisionHandler(SimpleContestHandler("add_division.html")):
         try:
             attrs = dict()
 
-            id = self.get_argument("id", "")
+            self.get_string(attrs, "name")
             self.get_string(attrs, "display_name")
             self.get_string(attrs, "score_type")
-            params = self.get_argument("score_type_parameters", "null")
+            params = self.get_argument("score_type_parameters", None) or "null"
             attrs["score_type_parameters"] = json.loads(params)
-
-            assert attrs.get("id") != "", "Empty ID."
 
             # Create the division.
             div = Division(**attrs)
-            div.id = id
             div.contest = contest
             self.sql_session.add(div)
 
@@ -264,9 +261,9 @@ class AddDivisionHandler(SimpleContestHandler("add_division.html")):
 
 class DeleteDivisionHandler(BaseHandler):
     @require_permission(BaseHandler.PERMISSION_ALL)
-    def delete(self, contest_id, division_id):
+    def delete(self, contest_id, division_name):
         contest = self.safe_get_item(Contest, contest_id)
-        the_div = {d.id: d for d in contest.divisions}.get(division_id)
+        the_div = contest.divisions.get(division_name)
         if the_div is None:
             raise tornado_web.HTTPError(404)
 

@@ -58,7 +58,7 @@ class RankingHandler(BaseHandler):
         score_type = "sum"
         score_params = None
         if division is not None:
-            div = {d.id: d for d in self.contest.divisions}.get(division)
+            div = self.contest.divisions.get(division)
             if div is not None:
                 score_type = div.score_type
                 score_params = div.score_type_parameters

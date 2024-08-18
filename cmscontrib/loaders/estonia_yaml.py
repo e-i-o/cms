@@ -226,7 +226,7 @@ class EstYamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
         for p in participations:
             p["password"] = build_password(p["password"])
 
-        divisions = []
+        divisions = {}
         for div in conf.get("divisions", []):
             score_mode = div.get("score_mode")
             if score_mode is None:
@@ -241,12 +241,11 @@ class EstYamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
                 score_type = score_mode[0]
                 score_type_parameters = score_mode[1]
             the_d = Division(
+                name=div["id"],
                 display_name=div["display_name"],
                 score_type=score_type,
                 score_type_parameters=score_type_parameters)
-            # this can't be set in the constructor
-            the_d.id = div["id"]
-            divisions.append(the_d)
+            divisions[div["id"]] = the_d
         args["divisions"] = divisions
 
         # Import was successful

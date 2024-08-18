@@ -32,7 +32,8 @@ from datetime import datetime, timedelta
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.orm import relationship
-from sqlalchemy.schema import Column, ForeignKey, CheckConstraint
+from sqlalchemy.orm.collections import attribute_mapped_collection
+from sqlalchemy.schema import Column, ForeignKey, CheckConstraint, UniqueConstraint
 from sqlalchemy.types import Integer, Unicode, DateTime, Interval, Enum, \
     Boolean, String
 
@@ -284,6 +285,7 @@ class Contest(Base):
 
     divisions = relationship(
         "Division",
+        collection_class=attribute_mapped_collection("name"),
         cascade="all, delete-orphan",
         passive_deletes=True,
         back_populates="contest")
@@ -366,29 +368,42 @@ class Division(Base):
     match these.
     """
     __tablename__ = 'contest_divisions'
+    __table_args__ = (
+        UniqueConstraint('contest_id', 'name'),
+    )
 
+    # Auto increment primary key.
     id = Column(
+        Integer,
+        primary_key=True)
+
+    # Identifier of this division
+    name = Column(
         Codename,
-        primary_key=True,
         nullable=False)
 
+    # Pretty name of the division (for RWS)
     display_name = Column(
         String,
         nullable=False)
 
+    # Score type for the contest (how to aggregate task scores into contest
+    # score).
     score_type = Column(
         String,
         nullable=False)
 
+    # Parameters for the score type, if any.
     score_type_parameters = Column(
         JSONB)
 
+    # The contest this division belongs to.
     contest_id = Column(
         Integer,
         ForeignKey(Contest.id,
                    onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
-        primary_key=True)
+        index=True)
     contest = relationship(
         Contest,
         back_populates="divisions")

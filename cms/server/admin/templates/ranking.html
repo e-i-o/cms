@@ -6,7 +6,7 @@
 </div>
 View division: <a href="{{ url("contest", contest.id, "ranking", "online") }}">all users</a>
 {%- for div in contest.divisions -%}
-  , <a href="{{ url("contest", contest.id, "ranking", "online", "division", div.id) }}">{{ div.id }}</a>
+  , <a href="{{ url("contest", contest.id, "ranking", "online", "division", div) }}">{{ div }}</a>
 {%- endfor %}
 <br>
 Download as <a href="{{ url("contest", contest.id, "ranking", "csv", *download_link_suffix) }}">csv</a>, <a href="{{ url("contest", contest.id, "ranking", "txt", *download_link_suffix) }}">text</a>.

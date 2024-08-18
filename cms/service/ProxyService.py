@@ -342,8 +342,8 @@ class ProxyService(TriggeredService):
                 "score_precision": contest.score_precision,
                 "divisions": {},
             }
-            for div in contest.divisions:
-                contest_data["divisions"][div.id] = {
+            for div in contest.divisions.values():
+                contest_data["divisions"][div.name] = {
                     "name": div.display_name,
                     "score_type": div.score_type,
                     "score_type_parameters": div.score_type_parameters,

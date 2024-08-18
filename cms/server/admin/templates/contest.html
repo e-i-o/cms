@@ -299,13 +299,13 @@
       <th>Score type parameters</th>
       <th></th>
     </tr>
-    {% for div in contest.divisions %}
+    {% for div in contest.divisions.values() %}
       <tr>
-        <td>{{ div.id }}</td>
+        <td>{{ div.name }}</td>
         <td>{{ div.display_name }}</td>
         <td>{{ div.score_type }}</td>
         <td>{{ div.score_type_parameters|tojson }}</td>
-        <td><a onclick="CMS.AWSUtils.ajax_delete('{{ url("contest", contest.id, "division", div.id, "delete") }}');">Delete</a></td>
+        <td><a onclick="CMS.AWSUtils.ajax_delete('{{ url("contest", contest.id, "division", div.name, "delete") }}');">Delete</a></td>
       </tr>
     {% endfor %}
   </table>
