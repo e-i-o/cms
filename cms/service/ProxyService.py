@@ -339,7 +339,15 @@ class ProxyService(TriggeredService):
                 "name": contest.description,
                 "begin": int(make_timestamp(contest.start)),
                 "end": int(make_timestamp(contest.stop)),
-                "score_precision": contest.score_precision}
+                "score_precision": contest.score_precision,
+                "divisions": {},
+            }
+            for div in contest.divisions:
+                contest_data["divisions"][div.id] = {
+                    "name": div.display_name,
+                    "score_type": div.score_type,
+                    "score_type_parameters": div.score_type_parameters,
+                }
 
             users = dict()
             teams = dict()
@@ -353,6 +361,7 @@ class ProxyService(TriggeredService):
                         "l_name": user.last_name,
                         "team": encode_id(team.code)
                                 if team is not None else None,
+                        "division": participation.division,
                     }
                     if team is not None:
                         teams[encode_id(team.code)] = {
@@ -372,6 +381,7 @@ class ProxyService(TriggeredService):
                     "extra_headers": score_type.ranking_headers,
                     "score_precision": task.score_precision,
                     "score_mode": task.score_mode,
+                    "divisions": task.divisions,
                 }
 
         self.enqueue(ProxyOperation(ProxyExecutor.CONTEST_TYPE,

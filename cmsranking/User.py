@@ -26,6 +26,7 @@ class User(Entity):
     - f_name (unicode): the first name of the user
     - l_name (unicode): the last name of the user
     - team (unicode): the id of the team the user belongs to
+    - division (unicode): division of the user
 
     """
     def __init__(self):
@@ -36,6 +37,7 @@ class User(Entity):
         self.f_name = None
         self.l_name = None
         self.team = None
+        self.division = None
 
     @staticmethod
     def validate(data):
@@ -54,6 +56,9 @@ class User(Entity):
             assert data['team'] is None or \
                 isinstance(data['team'], str), \
                 "Field 'team' isn't a string (or null)"
+            assert data['division'] is None or \
+                isinstance(data['division'], str), \
+                "Field 'division' isn't a string (or null)"
         except KeyError as exc:
             raise InvalidData("Field %s is missing" % exc)
         except AssertionError as exc:
@@ -64,6 +69,7 @@ class User(Entity):
         self.f_name = data['f_name']
         self.l_name = data['l_name']
         self.team = data['team']
+        self.division = data['division']
 
     def get(self):
         result = self.__dict__.copy()

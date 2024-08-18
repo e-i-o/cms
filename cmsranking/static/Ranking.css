@@ -1096,13 +1096,17 @@ abbr {
 
 /* Style for the network status indicator */
 
-#ConnectionStatus_box {
+#ConnectionStatus_box, #DivisionSelect_box {
     display: inline-block;
     position: relative;
     float: right;
     margin: 0.5em;
     text-align: right;
     z-index: 2;
+}
+
+#DivisionSelect_box.hidden {
+    display: none;
 }
 
 #ConnectionStatus_label {

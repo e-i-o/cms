@@ -288,6 +288,27 @@
       <td><input type="text" name="analysis_stop" value="{{ contest.analysis_stop }}"></td>
     </tr>
   </table>
+  <h2>Divisions</h2>
+  The divisions in this list will appear in the ranking. Divisions of tasks or users aren't restricted to this list.<br>
+  <a href="{{ url("contest", contest.id, "divisions", "add") }}">Add division</a>
+  <table>
+    <tr>
+      <th>ID</th>
+      <th>Display name</th>
+      <th>Score type</th>
+      <th>Score type parameters</th>
+      <th></th>
+    </tr>
+    {% for div in contest.divisions %}
+      <tr>
+        <td>{{ div.id }}</td>
+        <td>{{ div.display_name }}</td>
+        <td>{{ div.score_type }}</td>
+        <td>{{ div.score_type_parameters|tojson }}</td>
+        <td><a onclick="CMS.AWSUtils.ajax_delete('{{ url("contest", contest.id, "division", div.id, "delete") }}');">Delete</a></td>
+      </tr>
+    {% endfor %}
+  </table>
   <input type="submit"
          value="Update"
 {% if not admin.permission_all %}

@@ -36,6 +36,7 @@ from cms import TOKEN_MODE_DISABLED, TOKEN_MODE_FINITE, TOKEN_MODE_INFINITE, \
     FEEDBACK_LEVEL_FULL, FEEDBACK_LEVEL_RESTRICTED
 from cms.db import Contest, User, Task, Statement, Attachment, Team, Dataset, \
     Manager, Testcase
+from cms.db.contest import Division
 from cms.grading.languagemanager import LANGUAGES, HEADER_EXTS
 from cmscommon.constants import \
     SCORE_MODE_MAX, SCORE_MODE_MAX_SUBTASK, SCORE_MODE_MAX_TOKENED_LAST
@@ -223,6 +224,29 @@ class EstYamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
         participations = [] if participations is None else participations
         for p in participations:
             p["password"] = build_password(p["password"])
+
+        divisions = []
+        for div in conf.get("divisions", []):
+            score_mode = div.get("score_mode")
+            if score_mode is None:
+                score_type = "sum"
+                score_type_parameters = None
+            elif isinstance(score_mode, str):
+                score_type = score_mode
+                score_type_parameters = None
+            else:
+                assert isinstance(score_mode, list)
+                assert len(score_mode) == 2
+                score_type = score_mode[0]
+                score_type_parameters = score_mode[1]
+            the_d = Division(
+                display_name=div["display_name"],
+                score_type=score_type,
+                score_type_parameters=score_type_parameters)
+            # this can't be set in the constructor
+            the_d.id = div["id"]
+            divisions.append(the_d)
+        args["divisions"] = divisions
 
         # Import was successful
         os.remove(os.path.join(self.path, ".import_error_contest"))

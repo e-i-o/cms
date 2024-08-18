@@ -29,7 +29,7 @@
 
 from datetime import datetime, timedelta
 
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.orm import relationship
 from sqlalchemy.schema import Column, ForeignKey, CheckConstraint
@@ -282,6 +282,12 @@ class Contest(Base):
         passive_deletes=True,
         back_populates="contest")
 
+    divisions = relationship(
+        "Division",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="contest")
+
     def phase(self, timestamp):
         """Return: -1 if contest isn't started yet at time timestamp,
                     0 if the contest is active at time timestamp,
@@ -352,3 +358,37 @@ class Announcement(Base):
         nullable=True,
         index=True)
     admin = relationship(Admin)
+
+class Division(Base):
+    """
+    Represents one division for which a separate ranking can be generated. Only
+    used for ranking (in RWS and AWS), the user/task divisions don't need to
+    match these.
+    """
+    __tablename__ = 'contest_divisions'
+
+    id = Column(
+        Codename,
+        primary_key=True,
+        nullable=False)
+
+    display_name = Column(
+        String,
+        nullable=False)
+
+    score_type = Column(
+        String,
+        nullable=False)
+
+    score_type_parameters = Column(
+        JSONB)
+
+    contest_id = Column(
+        Integer,
+        ForeignKey(Contest.id,
+                   onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+        primary_key=True)
+    contest = relationship(
+        Contest,
+        back_populates="divisions")

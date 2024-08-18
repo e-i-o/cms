@@ -28,8 +28,14 @@
 
 """
 
+import json
+try:
+    import tornado4.web as tornado_web
+except ImportError:
+    import tornado.web as tornado_web
 from cms import ServiceCoord, get_service_shards, get_service_address
 from cms.db import Contest, Participation, Submission
+from cms.db.contest import Division
 from cmscommon.datetime import make_datetime
 
 from .base import BaseHandler, SimpleContestHandler, SimpleHandler, \
@@ -220,3 +226,52 @@ class RemoveContestHandler(BaseHandler):
 
         # Maybe they'll want to do this again (for another contest)
         self.write("../../contests")
+
+class AddDivisionHandler(SimpleContestHandler("add_division.html")):
+    @require_permission(BaseHandler.PERMISSION_ALL)
+    def post(self, contest_id):
+        fallback_page = self.url("contest", contest_id, "divisions", "add")
+        contest = self.safe_get_item(Contest, contest_id)
+
+        try:
+            attrs = dict()
+
+            id = self.get_argument("id", "")
+            self.get_string(attrs, "display_name")
+            self.get_string(attrs, "score_type")
+            params = self.get_argument("score_type_parameters", "null")
+            attrs["score_type_parameters"] = json.loads(params)
+
+            assert attrs.get("id") != "", "Empty ID."
+
+            # Create the division.
+            div = Division(**attrs)
+            div.id = id
+            div.contest = contest
+            self.sql_session.add(div)
+
+        except Exception as error:
+            self.service.add_notification(
+                make_datetime(), "Invalid field(s)", repr(error))
+            self.redirect(fallback_page)
+            return
+
+        if self.try_commit():
+            # Create the division on RWS.
+            self.service.proxy_service.reinitialize()
+
+        self.redirect(self.url("contest", contest_id))
+
+class DeleteDivisionHandler(BaseHandler):
+    @require_permission(BaseHandler.PERMISSION_ALL)
+    def delete(self, contest_id, division_id):
+        contest = self.safe_get_item(Contest, contest_id)
+        the_div = {d.id: d for d in contest.divisions}.get(division_id)
+        if the_div is None:
+            raise tornado_web.HTTPError(404)
+
+        self.sql_session.delete(the_div)
+        if self.try_commit():
+            self.service.proxy_service.reinitialize()
+
+        self.write(self.url("contest", contest_id))

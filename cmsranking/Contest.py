@@ -38,6 +38,7 @@ class Contest(Entity):
         self.begin = None
         self.end = None
         self.score_precision = None
+        self.divisions = None
 
     @staticmethod
     def validate(data):
@@ -61,6 +62,19 @@ class Contest(Entity):
                 "Field 'score_precision' isn't an integer"
             assert data['score_precision'] >= 0, \
                 "Field 'score_precision' is negative"
+            assert isinstance(data['divisions'], dict), \
+                "Field 'divisions' isn't a dict"
+            for k, v in data['divisions'].items():
+                assert isinstance(k, str), \
+                    "Field 'divisions' key isn't a string"
+                assert isinstance(v, dict), \
+                    "Field 'divisions' value isn't a dictionary"
+                assert isinstance(v['name'], str), \
+                    "Division field 'name' isn't a string"
+                assert isinstance(v['score_type'], str), \
+                    "Division field 'score_type' isn't a string"
+                v['score_type_parameters'] # assert existence
+
         except KeyError as exc:
             raise InvalidData("Field %s is missing" % exc)
         except AssertionError as exc:
@@ -72,6 +86,7 @@ class Contest(Entity):
         self.begin = data['begin']
         self.end = data['end']
         self.score_precision = data['score_precision']
+        self.divisions = data['divisions']
 
     def get(self):
         result = self.__dict__.copy()

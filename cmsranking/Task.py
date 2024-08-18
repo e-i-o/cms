@@ -48,6 +48,7 @@ class Task(Entity):
         self.extra_headers = None
         self.order = None
         self.score_mode = None
+        self.divisions = None
 
     @staticmethod
     def validate(data):
@@ -80,6 +81,9 @@ class Task(Entity):
                     "Field 'extra_headers' isn't a list of strings"
             assert isinstance(data['order'], int), \
                 "Field 'order' isn't an integer"
+            assert data['divisions'] is None or \
+                    isinstance(data['divisions'], str), \
+                "Field 'divisions' isn't a string or null"
         except KeyError as exc:
             raise InvalidData("Field %s is missing" % exc)
         except AssertionError as exc:
@@ -95,6 +99,7 @@ class Task(Entity):
         self.extra_headers = data['extra_headers']
         self.order = data['order']
         self.score_mode = data['score_mode']
+        self.divisions = data['divisions']
 
     def get(self):
         result = self.__dict__.copy()

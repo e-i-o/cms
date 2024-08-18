@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block core %}
+<div class="core_title">
+  <h1>Add division</h1>
+</div>
+<form enctype="multipart/form-data" action="{{ url("contest", contest.id, "divisions", "add") }}" method="POST">
+  {{ xsrf_form_html|safe }}
+  <table>
+    <tr>
+      <td>ID</td>
+      <td><input type="text" name="id"></td>
+    </tr>
+    <tr>
+      <td>Display name</td>
+      <td><input type="text" name="display_name"></td>
+    </tr>
+    <tr>
+      <td><span class="info" title="Valid values: 'sum' to simply add points on each task, 'top_n' to add points of best N tasks."></span> Score type</td>
+      <td><input type="text" name="score_type"></td>
+    </tr>
+    <tr>
+      <td><span class="info" title="JSON data. For 'sum', ignored. For 'top_n', must be the number of tasks to include."></span> Score type parameters</td>
+      <td><input type="text" name="score_type_parameters"></td>
+    </tr>
+  </table>
+  <input type="submit" value="Add">
+  <input type="reset" value="Reset">
+</form>
+{% endblock core %}

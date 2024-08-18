@@ -33,7 +33,9 @@ from .contest import \
     OverviewHandler, \
     ResourcesListHandler, \
     ContestListHandler, \
-    RemoveContestHandler
+    RemoveContestHandler, \
+    AddDivisionHandler, \
+    DeleteDivisionHandler
 from .contestannouncement import \
     AddAnnouncementHandler, \
     AnnouncementHandler
@@ -122,6 +124,8 @@ HANDLERS = [
     (r"/contest/([0-9]+)", ContestHandler),
     (r"/contest/([0-9]+)/overview", OverviewHandler),
     (r"/contest/([0-9]+)/resourceslist", ResourcesListHandler),
+    (r"/contest/([0-9]+)/divisions/add", AddDivisionHandler),
+    (r"/contest/([0-9]+)/division/([A-Za-z0-9_-]+)/delete", DeleteDivisionHandler),
 
     # Contest's users
 
@@ -157,8 +161,8 @@ HANDLERS = [
 
     # Contest's ranking
 
-    (r"/contest/([0-9]+)/ranking", RankingHandler),
     (r"/contest/([0-9]+)/ranking/([a-z]+)", RankingHandler),
+    (r"/contest/([0-9]+)/ranking/([a-z]+)/division/([A-Za-z0-9_-]+)", RankingHandler),
 
     # Tasks
 
