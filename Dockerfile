@@ -39,13 +39,14 @@ USER cmsuser
 RUN mkdir -p /home/cmsuser/cms
 WORKDIR /home/cmsuser/cms
 COPY --chown=cmsuser:cmsuser requirements.txt .
-RUN python3.8 -m venv venv && \
-    venv/bin/pip install -r requirements.txt
+RUN python3.8 -m venv ../venv && \
+    ../venv/bin/pip install -r requirements.txt
 
 FROM common AS base
 COPY --chown=cmsuser:cmsuser . .
 RUN sudo python3.8 prerequisites.py --yes --cmsuser=cmsuser install
-RUN venv/bin/python setup.py install
+RUN ../venv/bin/python setup.py install
+WORKDIR /home/cmsuser
 
 # this doesn't use `FROM base AS worker` because that would cause all compilers
 # to be reinstalled (which takes forever) any time CMS code changes.
@@ -64,4 +65,15 @@ RUN curl https://downloads.python.org/pypy/pypy3.10-v7.3.13-linux64.tar.bz2 -o /
 
 COPY --chown=cmsuser:cmsuser . .
 RUN sudo python3.8 prerequisites.py --yes --cmsuser=cmsuser install
-RUN venv/bin/python setup.py install
+RUN ../venv/bin/python setup.py install
+WORKDIR /home/cmsuser
+
+# the following target installs CMS in editable mode, which allows
+# bind-mounting the repository from outside docker, thus allowing for rapid
+# prototyping. (save file, restart cms process - no image rebuild needed)
+FROM worker AS worker-local
+
+RUN cd cms && ../venv/bin/python setup.py develop
+# This would get overwritten by a bind mount - put it in a spot where python
+# can still find it, but where it won't get overwritten
+RUN mv cms/cms.egg-info venv/lib/python*/site-packages/
