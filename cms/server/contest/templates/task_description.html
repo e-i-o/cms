@@ -2,6 +2,21 @@
 
 {% set page = "task_description" %}
 
+{% block additional_js %}
+update_solution_template = function () {
+  var selector_element = $("#sel-sol-template");
+  if(selector_element.length == 0) {
+    $(".sol-templates").removeClass("hidden");
+  } else {
+    var selected_lang = selector_element.val();
+    $(".sol-templates").addClass("hidden");
+    // the current language name probably wouldn't make a valid jquery query, so use plain JS here
+    document.getElementById("sol-template-" + selected_lang).classList.remove("hidden");
+  }
+}
+$(document).ready(update_solution_template);
+{% endblock additional_js %}
+
 {% block core %}
 
 
@@ -83,6 +98,23 @@
 </div>
 {% endif %}
 
+{% if task.solution_templates|length > 0 %}
+  <h2>{% trans %}Solution template{% endtrans %}
+    {% if task.solution_templates|length > 1 %}
+      <select id="sel-sol-template" onchange="update_solution_template();">
+        {% for template in task.solution_templates.values()|sort(attribute="language") %}
+          <option value="{{ template.language }}">{{ template.language }}</option>
+        {% endfor %}
+      </select>
+    {% endif %}
+  </h2>
+
+  {% trans %}You may use the template below as a starting point for your solution. You may change anything in this template. You may also completely ignore it if you want to read input or format output in some other way or structure your solution differently.{% endtrans %}
+
+  {% for template in task.solution_templates.values()|sort(attribute="language") %}
+    <pre class="sol-templates hidden" id="sol-template-{{ template.language }}">{{ template.content }}</pre>
+  {% endfor %}
+{% endif %}
 
 <h2>{% trans %}Some details{% endtrans %}</h2>
 

@@ -35,8 +35,9 @@ import yaml
 from cms import TOKEN_MODE_DISABLED, TOKEN_MODE_FINITE, TOKEN_MODE_INFINITE, \
     FEEDBACK_LEVEL_FULL, FEEDBACK_LEVEL_RESTRICTED
 from cms.db import Contest, User, Task, Statement, Attachment, Team, Dataset, \
-    Manager, Testcase
+    Manager, Testcase, SolutionTemplate
 from cms.db.contest import Division
+from cms.grading import languagemanager
 from cms.grading.languagemanager import LANGUAGES, HEADER_EXTS
 from cmscommon.constants import \
     SCORE_MODE_MAX, SCORE_MODE_MAX_SUBTASK, SCORE_MODE_MAX_TOKENED_LAST
@@ -476,6 +477,20 @@ class EstYamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
                     os.path.join(self.path, "att", filename),
                     "Attachment %s for task %s" % (filename, name))
                 args["attachments"][filename] = Attachment(filename, digest)
+
+        args["solution_templates"] = dict()
+        for template_file in sorted(glob.glob("%s/templates/template*" % self.path)):
+            template_basename = os.path.basename(template_file)
+            lang = languagemanager.filename_to_language(template_file)
+            if lang is None:
+                logger.warning("Unknown file %s found in templates directory" % template_basename)
+                continue
+            if lang.name in args["solution_templates"]:
+                logger.warning("Duplicate template %s for language %s - ignoring" % (template_basename, lang.name))
+                continue
+            with open(template_file) as f:
+                content = f.read()
+            args["solution_templates"][lang.name] = SolutionTemplate(lang.name, content)
 
         # Score precision.
         load(conf, args, "score_precision")

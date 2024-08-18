@@ -917,6 +917,16 @@ msgstr ""
 msgid "%(lang)s"
 msgstr ""
 
+msgid "Solution template"
+msgstr ""
+
+msgid ""
+"You may use the template below as a starting point for your solution. You "
+"may change anything in this template. You may also completely ignore it if "
+"you want to read input or format output in some other way or structure your "
+"solution differently."
+msgstr ""
+
 msgid "Some details"
 msgstr ""
 

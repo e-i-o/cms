@@ -273,6 +273,25 @@ $("select[name=task_type_{{ dataset.id }}]").change(function() {
     <div class="hr"></div>
   </div>
 
+  <h2 id="title_sol_templates" class="toggling_on">Solution templates</h2>
+  <div id="sol_templates">
+    <a href="{{ url("task", task.id, "sol_templates", "add") }}">Add language</a>
+    <table>
+    {% for language, template in task.solution_templates.items() %}
+      <tr>
+        {# AWS stylesheet tries to make tables stupidly compact by default, for some reason #}
+        <td style="font-size: inherit">
+          {{ language }}:<br>
+          <a onclick="CMS.AWSUtils.ajax_delete('{{ url("task", task.id, "sol_template", template.id) }}');">[delete]</a>
+        </td>
+        <td style="width: auto">
+          <textarea cols=80 rows=8 name="solution_template_{{ template.id }}">{{ template.content }}</textarea>
+        </td>
+      </tr>
+    {% endfor %}
+    </table>
+  </div>
+
 <!-- Datasets -->
 
   <h2 id="title_datasets" class="toggling_on">Datasets</h2>

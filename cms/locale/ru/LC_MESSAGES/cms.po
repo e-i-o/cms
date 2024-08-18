@@ -978,6 +978,21 @@ msgstr "<b>%(lang)s</b>"
 msgid "%(lang)s"
 msgstr "%(lang)s"
 
+msgid "Solution template"
+msgstr "Шаблон решения"
+
+msgid ""
+"You may use the template below as a starting point for your solution. You "
+"may change anything in this template. You may also completely ignore it if "
+"you want to read input or format output in some other way or structure your "
+"solution differently."
+msgstr ""
+"Вы можете использовать шаблон ниже в качестве отправной точки для вашего "
+"решения. Вы можете изменить что угодно в этом шаблоне. Вы также можете "
+"полностью игнорировать его, если хотите прочитать входные данные или "
+"отформатировать выходные данные каким-либо другим способом или "
+"структурировать свое решение по-другому."
+
 msgid "Some details"
 msgstr "Некоторые подробности"
 
