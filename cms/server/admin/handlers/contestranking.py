@@ -84,8 +84,12 @@ class RankingHandler(BaseHandler):
             score_nums = []
             for task in show_tasks:
                 t_score, t_partial = task_score(p, task, rounded=True)
+                all_submissions = [s for s in p.submissions if s.task is task and s.official]
+                has_submissions = len(all_submissions) > 0
                 score_nums.append(t_score)
                 t_score_fmt = f"{t_score:.{task.score_precision}f}"
+                if not has_submissions:
+                    t_score_fmt = ""
                 p.scores.append((t_score_fmt, t_partial))
                 partial = partial or t_partial
 
