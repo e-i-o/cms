@@ -178,6 +178,7 @@ setup(
         "cms.grading.scoretypes": [
             "Sum=cms.grading.scoretypes.Sum:Sum",
             "GroupMin=cms.grading.scoretypes.GroupMin:GroupMin",
+            "GroupMinDeps=cms.grading.scoretypes.GroupMinDeps:GroupMinDeps"
             "GroupMul=cms.grading.scoretypes.GroupMul:GroupMul",
             "GroupSum=cms.grading.scoretypes.GroupSum:GroupSum",
             "GroupSumCheck=cms.grading.scoretypes.GroupSumCheck:GroupSumCheck",
