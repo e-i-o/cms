@@ -646,7 +646,7 @@ class EstYamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
                     #assert(100 == sum([int(st[0]) for st in subtasks]))
                     n_input = sum([int(st[1]) for st in subtasks])
                     #args["score_type"] = "GroupMin"
-                    assert args["score_type"] in ["GroupMin", "GroupMul", "GroupSum", "GroupSumCond", "GroupSumCheck"]
+                    assert args["score_type"] in ["GroupMin", "GroupMinDeps", "GroupMul", "GroupSum", "GroupSumCond", "GroupSumCheck"]
                     if args["score_type"] == "GroupSumCond":
                         for st in subtasks:
                             assert len(st) >= 3
