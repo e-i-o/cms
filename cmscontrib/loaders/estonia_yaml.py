@@ -43,7 +43,7 @@ from cms.grading import languagemanager
 from cms.grading.languagemanager import LANGUAGES, HEADER_EXTS
 from cmscommon.constants import \
     SCORE_MODE_MAX, SCORE_MODE_MAX_SUBTASK, SCORE_MODE_MAX_TOKENED_LAST
-from cmscommon.crypto import build_password
+from cmscommon.crypto import build_password, generate_random_password
 from cmscontrib import touch
 from .base_loader import ContestLoader, TaskLoader, UserLoader, TeamLoader
 
@@ -293,6 +293,10 @@ class EstYamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
 
         load(conf, args, "username")
         load(conf, args, "password", conv=build_password)
+        if "password" not in args:
+            # this is the same as the default in db/user.py, but that default
+            # doesn't seem to work...
+            args["password"] = build_password(generate_random_password())
 
         load(conf, args, ["first_name", "nome"])
         load(conf, args, ["last_name", "cognome"])
