@@ -23,6 +23,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import datetime
 import logging
 import os
 import os.path
@@ -43,7 +44,6 @@ from cms.grading.languagemanager import LANGUAGES, HEADER_EXTS
 from cmscommon.constants import \
     SCORE_MODE_MAX, SCORE_MODE_MAX_SUBTASK, SCORE_MODE_MAX_TOKENED_LAST
 from cmscommon.crypto import build_password
-from cmscommon.datetime import make_datetime
 from cmscontrib import touch
 from .base_loader import ContestLoader, TaskLoader, UserLoader, TeamLoader
 
@@ -125,6 +125,10 @@ def load(src, dst, src_name, dst_name=None, conv=lambda i: i):
 def make_timedelta(t):
     return timedelta(seconds=t)
 
+def parse_datetime(v):
+    if isinstance(v, int) or isinstance(v, float):
+        return datetime.datetime.utcfromtimestamp(v)
+    return datetime.datetime.fromisoformat(v)
 
 class EstYamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
     """Load a contest, task, user or team stored using the Italian IOI format.
@@ -211,8 +215,8 @@ class EstYamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
             if args["token_gen_interval"].total_seconds() == 0:
                 args["token_gen_interval"] = timedelta(minutes=1)
 
-        load(conf, args, ["start", "inizio"], conv=make_datetime)
-        load(conf, args, ["stop", "fine"], conv=make_datetime)
+        load(conf, args, ["start", "inizio"], conv=parse_datetime)
+        load(conf, args, ["stop", "fine"], conv=parse_datetime)
         load(conf, args, ["per_user_time"], conv=make_timedelta)
         load(conf, args, ["timezone"])
 
