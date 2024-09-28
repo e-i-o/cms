@@ -44,7 +44,8 @@ class GroupMinDeps(GroupMin):
     @staticmethod
     def parse_parameters(parameters):
         parsed = {}
-        for kv in parameters:
+        # first 2 are points and number of testcases
+        for kv in parameters[2:]:
             if ":" not in kv:
                 continue
 
