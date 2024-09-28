@@ -225,7 +225,8 @@ class EstYamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
         participations = load(conf, None, ["users", "utenti"])
         participations = [] if participations is None else participations
         for p in participations:
-            p["password"] = build_password(p["password"])
+            if "password" in p:
+                p["password"] = build_password(p["password"])
 
         divisions = {}
         for div in conf.get("divisions", []):
@@ -448,17 +449,18 @@ class EstYamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
             load(conf, args, "token_gen_max")
         # Otherwise fall back on the old one.
         else:
-            logger.warning(
-                "task.yaml uses a deprecated format for token settings which "
-                "will soon stop being supported, you're advised to update it.")
             # Determine the mode.
             if conf.get("token_initial", None) is None:
                 args["token_mode"] = TOKEN_MODE_DISABLED
-            elif conf.get("token_gen_number", 0) > 0 and \
-                    conf.get("token_gen_time", 0) == 0:
-                args["token_mode"] = TOKEN_MODE_INFINITE
             else:
-                args["token_mode"] = TOKEN_MODE_FINITE
+                logger.warning(
+                    "task.yaml uses a deprecated format for token settings which "
+                    "will soon stop being supported, you're advised to update it.")
+                if conf.get("token_gen_number", 0) > 0 and \
+                        conf.get("token_gen_time", 0) == 0:
+                    args["token_mode"] = TOKEN_MODE_INFINITE
+                else:
+                    args["token_mode"] = TOKEN_MODE_FINITE
             # Set the old default values.
             args["token_gen_initial"] = 0
             args["token_gen_number"] = 0
@@ -687,10 +689,6 @@ class EstYamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
                         "as per task.yaml")
             load(conf, args, "score_type")
             load(conf, args, "score_type_parameters")
-        elif "score_type" in conf or "score_type_parameters" in conf:
-            logger.warning("To override score type data, task.yaml must "
-                           "specify both 'score_type' and "
-                           "'score_type_parameters'.")
 
         # If output_only is set, then the task type is OutputOnly
         if conf.get('output_only', False):
