@@ -269,3 +269,9 @@ class ContestLoader(BaseLoader):
 
         """
         pass
+
+    def post_contest_insertion(self, contest):
+        """Method that will be invoked after the contest has been inserted into
+        the DB, for post-processing.
+        """
+        pass

@@ -256,6 +256,10 @@ class EstYamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
 
         return Contest(**args), tasks, participations
 
+    def post_contest_insertion(self, contest):
+        with open(os.path.join(self.path, ".inserted_contest_id"), 'w') as f:
+            f.write(str(contest.id))
+
     def get_user(self):
         """See docstring in class UserLoader."""
 
