@@ -30,8 +30,6 @@
 
 import logging
 
-from .base import BaseHandler
-
 try:
     import tornado4.web as tornado_web
 except ImportError:
