@@ -64,40 +64,27 @@ class TaskDescriptionHandler(ContestHandler):
 class TaskStatementViewHandler(FileHandler):
     """Shows the statement file of a task in the contest.
 
-    logic:
-    - /tasks/(taskname)/statements/(langcode)/(taskname).(langcode).pdf returns the PDF
-    - /tasks/(taskname)/statements/(langcode),
-    - /tasks/(taskname)/statements/(langcode)/literally/anything/ all redirect to the URL that returns the PDF
-
-    Why? Because the thing at the end of the path will be offered as the filename when downloading the thing
     """
     @tornado_web.authenticated
     @actual_phase_required(0, 3)
     @multi_contest
-    def get(self, task_name, suffix):
+    def get(self, task_name, lang_code):
         task = self.get_task(task_name)
         if task is None:
             raise tornado_web.HTTPError(404)
 
-        if "/" not in suffix:
-            lang_code = suffix
-            suffix = ""
-        else:
-            lang_code, suffix = suffix.split("/", 1)
-
         if lang_code not in task.statements:
             raise tornado_web.HTTPError(404)
-
-        canonical_filename = "%s.%s.pdf" % (task.name, lang_code)
-        if suffix != canonical_filename:
-            self.sql_session.close()
-            self.redirect(self.contest_url("tasks", task.name, "statements", lang_code, canonical_filename))
-            return
 
         statement = task.statements[lang_code].digest
         self.sql_session.close()
 
-        self.fetch(statement, "application/pdf", None)
+        if len(lang_code) > 0:
+            filename = "%s.%s.pdf" % (task.name, lang_code)
+        else:
+            filename = "%s.pdf" % task.name
+
+        self.fetch(statement, "application/pdf", filename=filename, disposition="inline")
 
 
 class TaskAttachmentViewHandler(FileHandler):

@@ -69,7 +69,7 @@ class FileHandlerMixin(RequestHandler):
 
     """
 
-    def fetch(self, digest, content_type, filename=None):
+    def fetch(self, digest, content_type, filename=None, disposition=None):
         """Serve the file with the given digest.
 
         This will just add the headers required to trigger
@@ -83,6 +83,8 @@ class FileHandlerMixin(RequestHandler):
         self.set_header(FileServerMiddleware.DIGEST_HEADER, digest)
         if filename is not None:
             self.set_header(FileServerMiddleware.FILENAME_HEADER, filename)
+        if disposition is not None:
+            self.set_header(FileServerMiddleware.DISPOSITION_HEADER, disposition)
         self.set_header("Content-Type", content_type)
         self.finish()
 
