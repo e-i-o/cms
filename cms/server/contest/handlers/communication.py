@@ -37,6 +37,7 @@ except ImportError:
 from cms.server import multi_contest
 from cms.server.contest.communication import accept_question, \
     UnacceptableQuestion, QuestionsNotAllowed
+from cms.io import send_matrix_message
 from .contest import ContestHandler
 
 
@@ -67,10 +68,11 @@ class QuestionHandler(ContestHandler):
     @multi_contest
     def post(self):
         try:
-            accept_question(self.sql_session, self.current_user, self.timestamp,
+            q = accept_question(self.sql_session, self.current_user, self.timestamp,
                             self.get_argument("question_subject", ""),
                             self.get_argument("question_text", ""))
             self.sql_session.commit()
+            send_matrix_message(f"New question with ID {q.id} from {q.participation.user.username}: {q.subject}\n\n{q.text}".strip())
         except QuestionsNotAllowed:
             raise tornado_web.HTTPError(404)
         except UnacceptableQuestion as e:

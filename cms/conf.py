@@ -161,6 +161,11 @@ class Config:
         self.max_jobs_per_user = 10
         self.pdf_printing_allowed = False
 
+        # Matrix notifier
+        self.matrix_bot_token = None
+        self.matrix_bot_room_id = None
+        self.matrix_bot_homeserver = None
+
         # Installed or from source?
         # We declare we are running from installed if the program was
         # NOT invoked through some python flavor, and the file is in

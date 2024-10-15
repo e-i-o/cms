@@ -30,6 +30,7 @@
 import logging
 
 from cms.db import Question, Announcement, Message
+from cms.io import send_matrix_message
 from cmscommon.datetime import make_timestamp
 
 

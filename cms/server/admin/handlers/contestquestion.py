@@ -33,6 +33,7 @@ except ImportError:
     import tornado.web as tornado_web
 
 from cms.db import Contest, Question, Participation
+from cms.io import send_matrix_message
 from cmscommon.datetime import make_datetime
 from .base import BaseHandler, require_permission
 
@@ -101,6 +102,7 @@ class QuestionReplyHandler(BaseHandler):
                         question.participation.user.username,
                         question.participation.contest.name,
                         question_id)
+            send_matrix_message(f"Reply to question with ID {question_id}: {question.reply_subject}\n{question.reply_text}".strip())
 
         self.redirect(ref)
 

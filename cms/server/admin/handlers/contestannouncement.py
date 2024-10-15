@@ -33,6 +33,7 @@ except ImportError:
 
 from cms.db import Contest, Announcement
 from cmscommon.datetime import make_datetime
+from cms.io import send_matrix_message
 from .base import BaseHandler, require_permission
 
 
@@ -50,7 +51,8 @@ class AddAnnouncementHandler(BaseHandler):
             ann = Announcement(make_datetime(), subject, text,
                                contest=self.contest, admin=self.current_user)
             self.sql_session.add(ann)
-            self.try_commit()
+            if self.try_commit():
+                send_matrix_message(f"New announcement made: {subject}\n\n{text}".strip())
         else:
             self.service.add_notification(
                 make_datetime(), "Subject is mandatory.", "")

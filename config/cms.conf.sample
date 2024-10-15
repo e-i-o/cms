@@ -188,5 +188,16 @@
 
 
 
+    "_section": "Matrix notifier",
+    "_help": "Set all of these values to null to not send any notifications",
+
+    "_help": "Access token for matrix account",
+    "matrix_bot_token": "syt_aAAaAaAAAaaaaAaaaAAAAAAaaAaAaAA_AaAaaAAAaAAAAAaaaaaa_aAaAaa",
+    "_help": "Matrix room ID (visible in \"Advanced settings\" menu) which notifications are sent to",
+    "matrix_bot_room_id": "!AAAaAAAaAaaaaAAAAa:matrix.org",
+    "_help": "Homeserver of the matrix bot account",
+    "matrix_bot_homeserver": "https://matrix.org",
+
+
     "_help": "This is the end of this file."
 }
