@@ -40,7 +40,7 @@ $(document).ready(update_solution_template);
 <div class="row statement one_statement">
     <div class="span9">
     {% for lang_code in task.statements %}
-        <a href="{{ contest_url("tasks", task.name, "statements", lang_code) }}" class="btn btn-large btn-success">{% trans %}Download task statement{% endtrans %}</a>
+        <a href="{{ contest_url("tasks", task.name, "statements", lang_code) }}" target="_blank" class="btn btn-large btn-success">{% trans %}Download task statement{% endtrans %}</a>
     {% endfor %}
     </div>
 </div>
@@ -54,7 +54,7 @@ $(document).ready(update_solution_template);
         </p>
     {% for statement in task.statements.values()|sort(attribute="language") %}
         {% if statement.language in task.primary_statements %}
-        <a href="{{ contest_url("tasks", task.name, "statements", statement.language) }}" class="btn btn-large btn-success">
+        <a href="{{ contest_url("tasks", task.name, "statements", statement.language) }}" target="_blank" class="btn btn-large btn-success">
             {% set language_name = statement.language|format_locale %}
             {% if statement.language != language_name %}
                 {% trans lang=language_name %}Statement in <b>{{ lang }}</b>{% endtrans %}
@@ -66,7 +66,7 @@ $(document).ready(update_solution_template);
     {% endfor %}
     {% for statement in task.statements.values()|sort(attribute="language") %}
         {% if statement.language in participation.user.preferred_languages and statement.language not in task.primary_statements %}
-        <a href="{{ contest_url("tasks", task.name, "statements", statement.language) }}" class="btn btn-large">
+        <a href="{{ contest_url("tasks", task.name, "statements", statement.language) }}" target="_blank" class="btn btn-large">
             {% set language_name = statement.language|format_locale %}
             {% if statement.language != language_name %}
                 {% trans lang=language_name %}Statement in <b>{{ lang }}</b>{% endtrans %}
@@ -82,7 +82,7 @@ $(document).ready(update_solution_template);
             <ul>
     {% for statement in task.statements.values()|sort(attribute="language") %}
                 <li>
-                    <a href="{{ contest_url("tasks", task.name, "statements", statement.language) }}">
+                    <a href="{{ contest_url("tasks", task.name, "statements", statement.language) }}" target="_blank">
         {% set language_name = statement.language|format_locale %}
         {% if statement.language != language_name %}
             {% trans lang=language_name %}<b>{{ lang }}</b>{% endtrans %}
