@@ -222,10 +222,9 @@ class ScoreTypeGroup(ScoreTypeAlone):
         <span class="title">
             {% trans index=st["idx"] %}Subtask {{ index }}{% endtrans %}
         </span>
-    {% if "score_ignore" not in st and "score_fraction" in st and "max_score" in st %}
-        {% set score = st["score_fraction"] * st["max_score"] %}
+    {% if "score_ignore" not in st and "score" in st and "max_score" in st %}
         <span class="score">
-            ({{ score|round(2)|format_decimal }}
+            ({{ st["score"]|format_decimal }}
              / {{ st["max_score"]|format_decimal }})
         </span>
     {% else %}
@@ -401,6 +400,8 @@ class ScoreTypeGroup(ScoreTypeAlone):
             if lang.is_interpreted:
                 submission_is_interpreted = True
 
+        score_precision = submission_result.submission.task.score_precision
+
         for st_idx, parameter in enumerate(self.parameters):
             target = targets[st_idx]
 
@@ -452,7 +453,9 @@ class ScoreTypeGroup(ScoreTypeAlone):
                 [float(evaluations[tc_idx].outcome) for tc_idx in target],
                 parameter)
             st_score = st_score_fraction * parameter[0]
+            rounded_score = round(st_score, score_precision)
 
+            # TODO: possibly we should use rounded_score everywhere here.
             score += st_score
             subtasks.append({
                 "idx": st_idx + 1,
@@ -460,6 +463,8 @@ class ScoreTypeGroup(ScoreTypeAlone):
                 # with a max score of zero is still properly rendered as
                 # correct or incorrect.
                 "score_fraction": st_score_fraction,
+                # But we also want the properly rounded score for display.
+                "score": rounded_score,
                 "max_score": parameter[0],
                 "testcases": testcases})
             if all(self.public_testcases[tc_idx] for tc_idx in target):
@@ -468,7 +473,7 @@ class ScoreTypeGroup(ScoreTypeAlone):
             else:
                 public_subtasks.append({"idx": st_idx + 1,
                                         "testcases": public_testcases})
-            ranking_details.append("%g" % round(st_score, 2))
+            ranking_details.append("%g" % rounded_score)
 
         return score, subtasks, public_score, public_subtasks, ranking_details
 
