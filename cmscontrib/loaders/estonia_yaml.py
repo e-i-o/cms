@@ -417,7 +417,7 @@ class EstYamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
             for s in statement_paths:
                  lang = s.split(".")[-2]
                  languages.append(lang)
-                 digest = self.file_cacher.put_file_from_path(s, "Statement for task %s(lang %s)" % (name, lang))
+                 digest = self.file_cacher.put_file_from_path(s, "Statement for task %s (language %s)" % (name, lang))
                  statements[lang] = (Statement(lang, digest))
                  logger.info("Loaded statement for language %s" % lang)
 
@@ -557,11 +557,11 @@ class EstYamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
                     digest = self.file_cacher.put_file_from_path(
                         grader_filename,
                         "Grader for task %s and language %s" %
-                        (task.name, lang))
+                        (task.name, lang.name))
                     args["managers"] += [
                         Manager("grader%s" % extension, digest)]
                 else:
-                    logger.warning("Grader for language %s not found ", lang)
+                    logger.warning("Grader for language %s not found", lang.name)
             # Read managers with other known file extensions
             for other_filename in os.listdir(os.path.join(self.path, "solution")):
                 if any(other_filename.endswith(header)
@@ -886,12 +886,13 @@ class EstYamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
             for filename in os.listdir(os.path.join(self.path, "att")):
                 files.append(os.path.join(self.path, "att", filename))
 
+        files += glob.glob("%s/templates/template*" % self.path)
+
         # Score file
         files.append(os.path.join(self.path, "gen", "GEN"))
 
         # Statement
-        files.append(os.path.join(self.path, "statement", "statement.pdf"))
-        files.append(os.path.join(self.path, "testo", "testo.pdf"))
+        files += glob.glob("%s/statement/statement.*.pdf" % self.path)
 
         # Managers
         files.append(os.path.join(self.path, "check", "checker"))
