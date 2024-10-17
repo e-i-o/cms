@@ -262,6 +262,14 @@ class EstYamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
         return Contest(**args), tasks, participations
 
     def post_contest_insertion(self, contest):
+        # set contest score_precision to highest task's score_precision
+        precision = 0
+        for task in contest.tasks:
+            precision = max(precision, task.score_precision)
+        logger.info("set score_precision to %d", precision)
+        contest.score_precision = precision
+
+        # write contest ID to file for our helper script
         with open(os.path.join(self.path, ".inserted_contest_id"), 'w') as f:
             f.write(str(contest.id))
 

@@ -121,9 +121,9 @@ class ContestImporter:
                 logger.info("Error while importing, no changes were made.")
                 return False
 
+            self.loader.post_contest_insertion(contest)
             session.commit()
             contest_id = contest.id
-            self.loader.post_contest_insertion(contest)
 
         logger.info("Import finished (new contest id: %s).", contest_id)
         return True

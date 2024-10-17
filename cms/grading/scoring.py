@@ -239,7 +239,7 @@ def _task_score_max_subtask(score_details_tokened):
         try:
             subtask_scores = dict(
                 (subtask["idx"],
-                 subtask["score_fraction"] * subtask["max_score"])
+                 subtask["score"])
                 for subtask in details)
         except Exception:
             subtask_scores = None
