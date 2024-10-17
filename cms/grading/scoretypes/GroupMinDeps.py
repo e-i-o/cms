@@ -78,7 +78,7 @@ class GroupMinDeps(GroupMin):
                         failed_deps = True
 
                 if failed_deps:
-                    st_score = subtasks[st_idx]["score_fraction"] * parameter[0]
+                    st_score = subtasks[st_idx]["score"]
                     score -= st_score
                     if public_subtasks[st_idx] == subtasks[st_idx]:
                         public_score -= st_score

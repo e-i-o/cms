@@ -455,8 +455,7 @@ class ScoreTypeGroup(ScoreTypeAlone):
             st_score = st_score_fraction * parameter[0]
             rounded_score = round(st_score, score_precision)
 
-            # TODO: possibly we should use rounded_score everywhere here.
-            score += st_score
+            score += rounded_score
             subtasks.append({
                 "idx": st_idx + 1,
                 # We store the fraction so that an "example" testcase
@@ -468,12 +467,15 @@ class ScoreTypeGroup(ScoreTypeAlone):
                 "max_score": parameter[0],
                 "testcases": testcases})
             if all(self.public_testcases[tc_idx] for tc_idx in target):
-                public_score += st_score
+                public_score += rounded_score
                 public_subtasks.append(subtasks[-1])
             else:
                 public_subtasks.append({"idx": st_idx + 1,
                                         "testcases": public_testcases})
             ranking_details.append("%g" % rounded_score)
+        # get rid of floating point errors
+        score = round(score, score_precision)
+        public_score = round(public_score, score_precision)
 
         return score, subtasks, public_score, public_subtasks, ranking_details
 
