@@ -75,7 +75,7 @@ CMS.AWSUtils.prototype.display_subpage = function(elements) {
     for (var i = 0; i < elements.length; ++i) {
         elements[i].appendTo(content);
     }
-    document.getElementById('subpage_popup').showModal();
+    document.getElementById('subpage_popup').show();
 };
 
 // set up some event listeners for the subpage
@@ -83,13 +83,12 @@ window.addEventListener('DOMContentLoaded', () => {
     $('#subpage_close').on('click', () => {
         document.getElementById('subpage_popup').close();
     });
-    $('#subpage_popup').on('click', (event) => {
-        var content_area = document.getElementById('subpage_content');
-        // if the click was outside the inner div, it was on the backdrop, so we should close the popup
-        if(!content_area.contains(event.target)) {
-            document.getElementById('subpage_popup').close();
-        }
-    })
+});
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === "Escape") {
+        document.getElementById('subpage_popup').close();
+    }
 });
 
 

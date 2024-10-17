@@ -261,20 +261,14 @@ ul.normal_list {
 #subpage_popup {
     max-width: 1000px;
     max-height: 90%;
-    position: relative;
-    padding: 0;
-}
-#subpage_content {
-    padding: 1em;
+    position: fixed;
+    overflow-y: scroll;
+    margin-right: 1em;
 }
 #subpage_close {
     position: absolute;
     right: 1em;
     top: 1em;
-}
-::backdrop {
-    background-color: #000;
-    opacity: 0.5;
 }
 
 #subpage h1 {
