@@ -262,6 +262,8 @@ ul.normal_list {
     max-width: 1000px;
     max-height: 90%;
     position: fixed;
+    top: 0;
+    bottom: 0;
     overflow-y: scroll;
     margin-right: 1em;
 }
