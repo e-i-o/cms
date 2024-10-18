@@ -26,6 +26,8 @@ filters, tests, etc. that are useful for generic global usage.
 
 from jinja2 import Environment, StrictUndefined, contextfilter, \
     contextfunction, environmentfunction
+import markdown
+import markupsafe
 
 from cms import TOKEN_MODE_DISABLED, TOKEN_MODE_FINITE, TOKEN_MODE_INFINITE, \
     TOKEN_MODE_MIXED, FEEDBACK_LEVEL_FULL, FEEDBACK_LEVEL_RESTRICTED
@@ -131,6 +133,9 @@ def today(ctx, dt):
     return dt.replace(tzinfo=utc).astimezone(timezone).date() \
         == now.replace(tzinfo=utc).astimezone(timezone).date()
 
+def markdown_filter(text):
+    result = markdown.markdown(text)
+    return markupsafe.Markup(result)
 
 def instrument_generic_toolbox(env):
     env.globals["iter"] = iter
@@ -156,6 +161,7 @@ def instrument_generic_toolbox(env):
     env.filters["any"] = any_
     env.filters["dictselect"] = dictselect
     env.filters["make_timestamp"] = make_timestamp
+    env.filters["markdown"] = markdown_filter
 
     env.tests["contains"] = lambda s, p: p in s
     env.tests["endswith"] = lambda s, p: s.endswith(p)
