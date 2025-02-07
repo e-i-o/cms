@@ -13,17 +13,17 @@
 
 {% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".cpp") %}
 <h3>C++</h3>
-<p><a href="https://en.cppreference.com/w/cpp">C++ reference</a></p>
+<p><a href="https://eio.ee/docs/reference/en/index.html">C++ reference</a></p>
 {% endif %}
 
 {% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".py") %}
 <h3>Python</h3>
-<p><a href="http://docs.python.org/3.10/">Python documentation</a></p>
+<p><a href="https://eio.ee/docs/python-3.10.16-docs-html/index.html">Python documentation</a></p>
 {% endif %}
 
 {% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".c") %}
 <h3>C</h3>
-<p><a href="https://en.cppreference.com/w/c">C reference</a></p>
+<p><a href="https://eio.ee/docs/reference/en/index.html">C reference</a></p>
 {% endif %}
 
 {% if contest.languages|map("to_language")|map(attribute="source_extensions")|any("contains", ".cs") %}
