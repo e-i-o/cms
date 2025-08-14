@@ -724,6 +724,18 @@ class YamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
         else:
             evaluation_param = "diff"
 
+        # If there is check/batchmanager, then this is an interactive
+        # task to be evaluated in a single sandbox
+        paths = [os.path.join(self.path, "check", "batchmanager")]
+        for path in paths:
+            if os.path.exists(path):
+                digest = self.file_cacher.put_file_from_path(
+                    path,
+                    "Manager for task %s" % task.name)
+                args["managers"] += [
+                    Manager("batchmanager", digest)]
+                break
+
         # Override score_type if explicitly specified
         if "score_type_parameters" in conf:
             logger.info("Overriding 'score_type_parameters' "
@@ -1061,6 +1073,7 @@ class YamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
         files.append(os.path.join(self.path, "cor", "correttore"))
         files.append(os.path.join(self.path, "check", "manager"))
         files.append(os.path.join(self.path, "cor", "manager"))
+        files.append(os.path.join(self.path, "check", "batchmanager"))
 
         if os.path.exists(os.path.join(self.path, "solution")):
             sol_dir = "solution"
