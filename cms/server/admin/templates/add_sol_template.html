@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block core %}
+<div class="core_title">
+  <h1><a href="{{ url("task", task.id) }}">{{ task.title }} ({{ task.name }})</a> - New solution template</h1>
+</div>
+<form enctype="multipart/form-data" action="{{ url("task", task.id, "sol_templates", "add") }}" method="POST">
+  {{ xsrf_form_html|safe }}
+  <select name="language">
+    <!-- should this be filtered to the enabled languages only?? -->
+    {% for lang in LANGUAGES %}
+      <option value="{{ lang.name }}">{{ lang.name }}</option>
+    {% endfor %}
+  </select><br>
+  <textarea cols="80" rows="8" name="content"></textarea><br>
+  <input type="submit" value="Upload">
+  <input type="Reset" >
+</form>
+{% endblock core %}
