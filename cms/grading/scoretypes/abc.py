@@ -42,7 +42,7 @@ from cms import (
 )
 from cms.db import SubmissionResult
 from cms.grading.languagemanager import get_language
-from cms.grading.steps import EVALUATION_MESSAGES
+from cms.grading.steps import EVALUATION_MESSAGES, COMPILATION_MESSAGES
 from cms.locale import Translation, DEFAULT_TRANSLATION
 from cms.server.jinja2_toolbox import GLOBAL_ENVIRONMENT
 from jinja2 import Template
@@ -336,6 +336,9 @@ class ScoreTypeGroup(ScoreTypeAlone):
                     <td class="outcome">{{ _(tc["outcome"]) }}</td>
                     <td class="details">
                       {{ tc["text"]|format_status_text }}
+                      {% if tc["help"] is not none %}
+                        <i class="icon-question-sign" title="{{ _(tc["help"]) }}"></i>
+                      {% endif %}
                     </td>
             {% if show_timing %}
                     <td class="execution-time">
@@ -412,6 +415,7 @@ class ScoreTypeGroup(ScoreTypeAlone):
                         "idx": tc["idx"],
                         "outcome": tc["outcome"],
                         "text": tc.get("text"),
+                        "help": tc["help"],
                     }
                     if feedback_level == FEEDBACK_LEVEL_FULL:
                         if "time" in tc:
@@ -579,11 +583,23 @@ class ScoreTypeGroup(ScoreTypeAlone):
                     if lang.is_interpreted:
                         time_limit = dataset.time_limit_interpreted
 
+                message_text = evaluations[tc_idx].text
+                helptext = None
+                # this is a hack, but the alternative requires threading the
+                # message ID through like 7 different functions, and that
+                # didn't feel particularly pleasant either.
+                for msg in EVALUATION_MESSAGES.all() + COMPILATION_MESSAGES.all():
+                    if message_text is not None and message_text[0:1] == [msg.message]:
+                        if msg.inline_help:
+                            helptext = msg.help_text
+                        break
+
                 testcases.append(
                     {
                         "idx": tc_idx,
                         "outcome": tc_outcome,
                         "text": evaluations[tc_idx].text,
+                        "help": helptext,
                         "time": evaluations[tc_idx].execution_time,
                         "time_limit": time_limit,
                         "time_limit_was_exceeded": time_limit_was_exceeded,
