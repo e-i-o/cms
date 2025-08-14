@@ -47,6 +47,11 @@ class JavaScriptNode(Language):
         """See Language.requires_multithreading."""
         return True
 
+    @property
+    def is_interpreted(self):
+        """See Language.is_interpreted."""
+        return True
+
     def get_compilation_commands(self,
                                  source_filenames, executable_filename,
                                  for_evaluation=True):

@@ -702,6 +702,9 @@ msgstr "Nimi"
 msgid "Time limit"
 msgstr "Ajalimiit"
 
+msgid "Python time limit"
+msgstr "Pythoni ajalimiit"
+
 msgid "Memory limit"
 msgstr "Mälulimiit"
 

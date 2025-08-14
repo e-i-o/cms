@@ -705,6 +705,9 @@ msgstr ""
 msgid "Time limit"
 msgstr ""
 
+msgid "Python time limit"
+msgstr ""
+
 msgid "Memory limit"
 msgstr ""
 

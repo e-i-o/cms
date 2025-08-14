@@ -718,6 +718,9 @@ msgstr "Название"
 msgid "Time limit"
 msgstr "Ограничение по времени"
 
+msgid "Python time limit"
+msgstr "Ограничение по времени для Python"
+
 msgid "Memory limit"
 msgstr "Ограничение по памяти"
 
