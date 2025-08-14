@@ -32,6 +32,8 @@ __all__ = [
     "RPCMiddleware",
     # web_service
     "WebService",
+    # matrix_sender
+    "send_matrix_message",
     ]
 
 
@@ -44,6 +46,7 @@ from .service import Service
 from .triggeredservice import Executor, TriggeredService
 from .web_rpc import RPCMiddleware
 from .web_service import WebService
+from .matrix_sender import send_matrix_message
 
 
 # Fix psycopg in order to support gevent greenlets.
