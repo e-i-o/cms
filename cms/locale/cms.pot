@@ -460,6 +460,9 @@ msgstr ""
 msgid "Login"
 msgstr ""
 
+msgid "Registration and information"
+msgstr ""
+
 msgid "Don't have an account?"
 msgstr ""
 

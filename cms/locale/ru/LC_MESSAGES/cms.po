@@ -471,6 +471,9 @@ msgstr "Пароль"
 msgid "Login"
 msgstr "Войти в систему"
 
+msgid "Registration and information"
+msgstr "Регистрация и информация"
+
 msgid "Don't have an account?"
 msgstr ""
 
