@@ -431,6 +431,9 @@ msgstr "Parool"
 msgid "Login"
 msgstr "Logi sisse"
 
+msgid "Registration and information"
+msgstr "Registreerumine ja lisainfo"
+
 msgid "Don't have an account?"
 msgstr "Pole kasutajat?"
 
