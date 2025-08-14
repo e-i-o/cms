@@ -29,10 +29,11 @@
 
 from datetime import datetime, timedelta
 
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.orm import relationship
-from sqlalchemy.schema import Column, ForeignKey, CheckConstraint
+from sqlalchemy.orm.collections import attribute_mapped_collection
+from sqlalchemy.schema import Column, ForeignKey, CheckConstraint, UniqueConstraint
 from sqlalchemy.types import Integer, Unicode, DateTime, Interval, Enum, \
     Boolean, String
 
@@ -295,6 +296,13 @@ class Contest(Base):
         passive_deletes=True,
         back_populates="contest")
 
+    divisions = relationship(
+        "Division",
+        collection_class=attribute_mapped_collection("name"),
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        back_populates="contest")
+
     def phase(self, timestamp: datetime) -> int:
         """Return: -1 if contest isn't started yet at time timestamp,
                     0 if the contest is active at time timestamp,
@@ -317,6 +325,11 @@ class Contest(Base):
             elif timestamp <= self.analysis_stop:
                 return 2
         return 3
+
+    def tasks_for(self, participation: "Participation | None"):
+        for task in self.tasks:
+            if task.visible_for(participation):
+                yield task
 
 
 class Announcement(Base):
@@ -364,3 +377,51 @@ class Announcement(Base):
         nullable=True,
         index=True)
     admin: Admin | None = relationship(Admin)
+
+
+class Division(Base):
+    """
+    Represents one division for which a separate ranking can be generated. Only
+    used for ranking (in RWS and AWS), the user/task divisions don't need to
+    match these.
+    """
+    __tablename__ = 'contest_divisions'
+    __table_args__ = (
+        UniqueConstraint('contest_id', 'name'),
+    )
+
+    # Auto increment primary key.
+    id = Column(
+        Integer,
+        primary_key=True)
+
+    # Identifier of this division
+    name = Column(
+        Codename,
+        nullable=False)
+
+    # Pretty name of the division (for RWS)
+    display_name = Column(
+        String,
+        nullable=False)
+
+    # Score type for the contest (how to aggregate task scores into contest
+    # score).
+    score_type = Column(
+        String,
+        nullable=False)
+
+    # Parameters for the score type, if any.
+    score_type_parameters = Column(
+        JSONB)
+
+    # The contest this division belongs to.
+    contest_id = Column(
+        Integer,
+        ForeignKey(Contest.id,
+                   onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+        index=True)
+    contest = relationship(
+        Contest,
+        back_populates="divisions")

@@ -257,10 +257,14 @@ class ContestHandler(BaseHandler):
         return: the corresponding task object, if found.
 
         """
-        return self.sql_session.query(Task) \
+        task = self.sql_session.query(Task) \
             .filter(Task.contest == self.contest) \
             .filter(Task.name == task_name) \
             .one_or_none()
+        if task and not task.visible_for(self.current_user):
+            return None
+        return task
+
 
     def get_submission(self, task: Task, opaque_id: str | int) -> Submission | None:
         """Return the num-th contestant's submission on the given task.

@@ -28,8 +28,11 @@
 
 """
 
+import json
+import tornado.web
 from cms import ServiceCoord, get_service_shards, get_service_address
 from cms.db import Contest, Participation, Submission
+from cms.db.contest import Division
 from cmscommon.datetime import make_datetime
 
 from .base import BaseHandler, SimpleContestHandler, SimpleHandler, \
@@ -221,3 +224,49 @@ class RemoveContestHandler(BaseHandler):
 
         # Maybe they'll want to do this again (for another contest)
         self.write("../../contests")
+
+class AddDivisionHandler(SimpleContestHandler("add_division.html")):
+    @require_permission(BaseHandler.PERMISSION_ALL)
+    def post(self, contest_id):
+        fallback_page = self.url("contest", contest_id, "divisions", "add")
+        contest = self.safe_get_item(Contest, contest_id)
+
+        try:
+            attrs = dict()
+
+            self.get_string(attrs, "name")
+            self.get_string(attrs, "display_name")
+            self.get_string(attrs, "score_type")
+            params = self.get_argument("score_type_parameters", None) or "null"
+            attrs["score_type_parameters"] = json.loads(params)
+
+            # Create the division.
+            div = Division(**attrs)
+            div.contest = contest
+            self.sql_session.add(div)
+
+        except Exception as error:
+            self.service.add_notification(
+                make_datetime(), "Invalid field(s)", repr(error))
+            self.redirect(fallback_page)
+            return
+
+        if self.try_commit():
+            # Create the division on RWS.
+            self.service.proxy_service.reinitialize()
+
+        self.redirect(self.url("contest", contest_id))
+
+class DeleteDivisionHandler(BaseHandler):
+    @require_permission(BaseHandler.PERMISSION_ALL)
+    def delete(self, contest_id, division_name):
+        contest = self.safe_get_item(Contest, contest_id)
+        the_div = contest.divisions.get(division_name)
+        if the_div is None:
+            raise tornado.web.HTTPError(404)
+
+        self.sql_session.delete(the_div)
+        if self.try_commit():
+            self.service.proxy_service.reinitialize()
+
+        self.write(self.url("contest", contest_id))

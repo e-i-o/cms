@@ -56,6 +56,52 @@ var DataStore = new function () {
     self.rank_events = $.Callbacks();
 
 
+    ////// Division filtering
+
+    self.filtered_division = null;
+    if (window.location.search != "") {
+        var url = new URLSearchParams(window.location.search);
+        self.filtered_division = url.get("division");
+    }
+
+    self.all_divisions = new Object();
+    self.update_division = function(name, div) {
+        if(name in self.all_divisions) {
+            // assume the display name of a division doesn't change between contests...
+            return;
+        }
+        self.all_divisions[name] = div;
+        $("#DivisionSelect_box").removeClass("hidden");
+        var opt = new Option(div["name"], name);
+        $("#DivisionSelect").append(opt);
+        if(name == self.filtered_division) {
+            $("#DivisionSelect").val(name);
+        }
+    }
+
+    $(document).ready(function() {
+        $("#DivisionSelect").on('input', function() {
+            value = $(this).val();
+            if(value == "")
+                window.location.search = "";
+            else
+                window.location.search = "division=" + value;
+        });
+    });
+
+    self.get_contest_score_params = function(contest) {
+        var score_type = "sum";
+        var score_params = null;
+        if (self.filtered_division !== null) {
+            var this_div = contest.divisions[self.filtered_division];
+            if (this_div !== undefined) {
+                score_type = this_div["score_type"];
+                score_params = this_div["score_type_parameters"];
+            }
+        }
+        return [score_type, score_params];
+    }
+
     ////// Contest
 
     self.contest_count = 0;
@@ -118,6 +164,10 @@ var DataStore = new function () {
         console.info("Created contest " + key);
         console.log(data);
 
+        for(div_id in data["divisions"]) {
+            self.update_division(div_id, data["divisions"][div_id]);
+        }
+
         self.contest_count += 1;
 
         self.contest_create.fire(key, data);
@@ -132,6 +182,10 @@ var DataStore = new function () {
         console.info("Updated contest " + key);
         console.log(old_data);
         console.log(data);
+
+        for(div_id in data["divisions"]) {
+            self.update_division(div_id, data["divisions"][div_id]);
+        }
 
         self.contest_update.fire(key, old_data, data);
     };
@@ -218,6 +272,10 @@ var DataStore = new function () {
             self.update_network_status(4);
             return;
         }
+        if (self.filtered_division !== null && data["divisions"] !== null && data["divisions"].split(" ").indexOf(self.filtered_division) == -1) {
+            // this task doesn't exist in this division
+            return;
+        }
 
         data["key"] = key;
         self.tasks[key] = data;
@@ -231,6 +289,9 @@ var DataStore = new function () {
     };
 
     self.update_task = function (key, data) {
+        if (self.filtered_division !== null && data["divisions"] !== null && data["divisions"].split(" ").indexOf(self.filtered_division) == -1) {
+            return;
+        }
         var old_data = self.tasks[key];
 
         data["key"] = key;
@@ -245,6 +306,7 @@ var DataStore = new function () {
 
     self.delete_task = function (key) {
         var old_data = self.tasks[key];
+        if (old_data === undefined) return;
 
         delete self.tasks[key];
 
@@ -420,6 +482,10 @@ var DataStore = new function () {
             return;
         }
 
+        if (self.filtered_division !== null && data["division"] !== null && data["division"] !== self.filtered_division) {
+            return;
+        }
+
         data["key"] = key;
         self.users[key] = data;
 
@@ -432,6 +498,12 @@ var DataStore = new function () {
     };
 
     self.update_user = function (key, data) {
+        // TODO: this will act weird when an user's division changes, and becomes the current filtered division.
+        // we should fire an user_create in that case instead
+        if (self.filtered_division !== null && data["division"] !== null && data["division"] !== self.filtered_division) {
+            return;
+        }
+
         var old_data = self.users[key];
 
         data["key"] = key;
@@ -446,6 +518,7 @@ var DataStore = new function () {
 
     self.delete_user = function (key) {
         var old_data = self.users[key];
+        if (old_data === undefined) return;
 
         delete self.users[key];
 
@@ -470,6 +543,7 @@ var DataStore = new function () {
         }
         // Maximum score
         data["max_score"] = 0.0;
+        data["task_scores"] = new Object();
         // Global score precision
         self.global_score_precision = 0;
         for (var c_id in self.contests) {
@@ -480,6 +554,7 @@ var DataStore = new function () {
     self.contest_update.add(function (key, old_data, data) {
         // Maximum score
         data["max_score"] = old_data["max_score"];
+        data["task_scores"] = old_data["task_scores"];
         delete old_data["max_score"];
         // Global score precision
         self.global_score_precision = 0;
@@ -502,14 +577,36 @@ var DataStore = new function () {
         }
     });
 
+    self.recompute_contest_max_score_topn = function(contest, top_n_count) {
+        var old_max = contest["max_score"];
+        var task_scores_list = [];
+        for(var t_id in contest.task_scores) {
+            task_scores_list.push(contest.task_scores[t_id]);
+        }
+        task_scores_list.sort(function(a, b) { return b - a; });
+        var max_score = 0.0;
+        for (var i = 0; i < top_n_count && i < task_scores_list.length; i++) {
+            max_score += task_scores_list[i];
+        }
+        contest["max_score"] = max_score;
+        self.global_max_score += max_score - old_max;
+    }
+
     self.task_create.add(function (key, data) {
         // Add scores
         for (var u_id in self.users) {
             self.users[u_id]["t_" + key] = 0.0;
         }
         // Maximum score
-        self.contests[data["contest"]]["max_score"] += data["max_score"];
-        self.global_max_score += data["max_score"];
+        var contest = self.contests[data["contest"]];
+        var score_params = self.get_contest_score_params(contest);
+        if (score_params[0] == "top_n") {
+            contest.task_scores[key] = data["max_score"];
+            self.recompute_contest_max_score_topn(contest, score_params[1]);
+        } else { // "sum" type
+            contest["max_score"] += data["max_score"];
+            self.global_max_score += data["max_score"];
+        }
     });
 
     self.task_update.add(function (key, old_data, data) {
@@ -518,10 +615,19 @@ var DataStore = new function () {
            handled by the server.
          */
         // Maximum score
-        self.contests[old_data["contest"]]["max_score"] -= old_data["max_score"];
-        self.global_max_score -= old_data["max_score"];
-        self.contests[data["contest"]]["max_score"] += data["max_score"];
-        self.global_max_score += data["max_score"];
+
+        // This assumes that the task's contest id doesn't change.
+        var contest = self.contests[data["contest"]];
+        var score_params = self.get_contest_score_params(contest);
+        if (score_params[0] == "top_n") {
+            contest.task_scores[key] = data["max_score"];
+            self.recompute_contest_max_score_topn(contest, score_params[1]);
+        } else { // "sum" type
+            self.contests[old_data["contest"]]["max_score"] -= old_data["max_score"];
+            self.global_max_score -= old_data["max_score"];
+            self.contests[data["contest"]]["max_score"] += data["max_score"];
+            self.global_max_score += data["max_score"];
+        }
     });
 
     self.task_delete.add(function (key, old_data) {
@@ -530,8 +636,15 @@ var DataStore = new function () {
             delete self.users[u_id]["t_" + key];
         }
         // Maximum score
-        self.contests[old_data["contest"]]["max_score"] -= old_data["max_score"];
-        self.global_max_score -= old_data["max_score"];
+        var contest = self.contests[old_data["contest"]];
+        var score_params = self.get_contest_score_params(contest);
+        if (score_params[0] == "top_n") {
+            delete contest.task_scores[key];
+            self.recompute_contest_max_score_topn(contest, score_params[1]);
+        } else { // "sum" type
+            self.contests[old_data["contest"]]["max_score"] -= old_data["max_score"];
+            self.global_max_score -= old_data["max_score"];
+        }
     });
 
     self.user_create.add(function (key, data) {
@@ -602,9 +715,11 @@ var DataStore = new function () {
     };
 
     self.set_score = function (u_id, t_id, new_t_score) {
-        /* It may be "nice" to check that the user and task do actually exists,
-           even if the server should already ensure it!
-         */
+        // if the user and task don't exist, they are probably for a different division
+        if (!(u_id in self.users) || !(t_id in self.tasks)) {
+            return;
+        }
+
         var user = self.users[u_id];
         var task = self.tasks[t_id];
 
@@ -617,10 +732,27 @@ var DataStore = new function () {
         user["t_" + t_id] = new_t_score;
 
         // Contest
-        var new_c_score = 0.0;  // = max(user's score on t for t in contest.tasks)
-        for (var i = 0; i < contest.tasks.length; i += 1) {
-            new_c_score += user["t_" + contest.tasks[i].key];
+        var new_c_score = 0.0;
+        var score_params = self.get_contest_score_params(contest);
+
+        if (score_params[0] == "top_n") {
+            var to_count = score_params[1];
+            var contest_scores = [];
+            for (var i = 0; i < contest.tasks.length; i += 1) {
+                contest_scores.push(user["t_" + contest.tasks[i].key]);
+            }
+            // sort descending
+            contest_scores.sort(function(a, b) { return b - a; });
+            // add up first `to_count` numbers from there (if there are that many, anyways)
+            for (var i = 0; i < to_count && i < contest_scores.length; i++) {
+                new_c_score += contest_scores[i];
+            }
+        } else { // default to "sum" mode
+            for (var i = 0; i < contest.tasks.length; i += 1) {
+                new_c_score += user["t_" + contest.tasks[i].key];
+            }
         }
+
         new_c_score = round(new_c_score, contest["score_precision"]);
         var old_c_score = user["c_" + c_id];
         user["c_" + c_id] = new_c_score;

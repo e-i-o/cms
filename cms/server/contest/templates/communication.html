@@ -44,7 +44,7 @@
                     <input type="text" name="question_subject" id="input_subject" class="input-xlarge" maxlength="50" list="task_names_list" autocomplete="off">
                     <datalist id="task_names_list">
                         {% if actual_phase >= 0 %}
-                            {% for task in contest.tasks %}
+                            {% for task in contest.tasks_for(participation) %}
                         <option value="{{ task.name }}">
                             {% endfor %}
                         {% endif %}

@@ -178,7 +178,7 @@ $(document).ready(function () {
                                 </a>
                             </li>
     {% if actual_phase >= 0 or participation.unrestricted %}
-        {% for t_iter in contest.tasks %}
+        {% for t_iter in contest.tasks_for(participation) %}
                             <li class="nav-header">
                                 {{ t_iter.name }}
                             </li>

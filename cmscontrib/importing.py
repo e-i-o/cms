@@ -315,4 +315,6 @@ def update_contest(old_contest: Contest, new_contest: Contest, parent=None):
         # must be handled differently.
         Contest.tasks: False,
         Contest.participations: False,
+        # Relationships to update.
+        Contest.divisions: True,
     }, parent=parent)
