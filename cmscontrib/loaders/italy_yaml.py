@@ -260,7 +260,7 @@ class YamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
             args["groups"] = [self.make_group(main_group)]
             args["main_group"] = args["groups"][0]
         else:
-            if main_group:
+            if False:
                 logger.critical("You should not specify `start', `stop', "
                                "`analysis_start', `analysis_end', or "
                                "`analysis_enabled' when using groups")
@@ -272,7 +272,7 @@ class YamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
                 else:
                     main_group_name = "main"
 
-            args["groups"] = [self.make_group(g) for g in groups]
+            args["groups"] = [self.make_group(main_group | g) for g in groups]
             args["main_group"] = [g for g in args["groups"]
                                     if g.name == main_group_name][0]
 
@@ -302,6 +302,21 @@ class YamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
                 args[key] = g_dict[key]
         if "per_user_time" in g_dict:
             args["per_user_time"] = make_timedelta(g_dict["per_user_time"])
+        score_mode = g_dict.get("score_mode")
+        if score_mode is None:
+            score_type = "sum"
+            score_type_parameters = None
+        elif isinstance(score_mode, str):
+            score_type = score_mode
+            score_type_parameters = None
+        else:
+            assert isinstance(score_mode, list)
+            assert len(score_mode) == 2
+            score_type = score_mode[0]
+            score_type_parameters = score_mode[1]
+        args["score_type"] = score_type
+        args["score_type_parameters"] = score_type_parameters
+        args["display_name"] = g_dict.get("display_name")
         return Group(**args)
 
     def post_contest_insertion(self, contest):
@@ -590,6 +605,7 @@ class YamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
         load(conf, args, "max_user_test_number")
         load(conf, args, "min_submission_interval", conv=make_timedelta)
         load(conf, args, "min_user_test_interval", conv=make_timedelta)
+        load(conf, args, "groups")
 
         # Attachments
         args["attachments"] = dict()

@@ -38,12 +38,15 @@
       <tr>
         <th></th>
         <th>Name</th>
+        <th>Display name</th>
         <th>Start (in UTC)</th>
         <th>End (in UTC)</th>
         <th>Max. contest length (in seconds)</th>
         <th>Analysis</th>
         <th>Analysis start</th>
         <th>Analysis end</th>
+        <th>Score type</th>
+        <th>Parameters</th>
       </tr>
     </thead>
     <tbody>
@@ -53,6 +56,7 @@
           <input type="radio" name="group_id" value="{{ g.id }}"/>
         </td>
         <td><a href="{{ url("contest", contest.id, "group", g.id, "edit") }}">{{ g.name }} {% if g.id == g.contest.main_group_id %}(main group){% endif %}</a></td>
+        <td>{{ g.display_name or "" }}</td>
         <td>{{ g.start }}</td>
         <td>{{ g.stop }}</td>
         <td>
@@ -63,6 +67,8 @@
         <td><input type="checkbox" disabled{{ " checked" if g.analysis_enabled else "" }}></td>
         <td>{{ g.analysis_start }}</td>
         <td>{{ g.analysis_stop }}</td>
+        <td>{{ g.score_type }}</td>
+        <td>{{ g.score_type_parameters|tojson }}</td>
       </tr>
       {% endfor %}
     </tbody>

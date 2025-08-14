@@ -282,6 +282,10 @@ class Contest(Base):
         passive_deletes=True,
         back_populates="contest")
 
+    def tasks_for(self, participation: "Participation | None"):
+        for task in self.tasks:
+            if task.visible_for(participation):
+                yield task
 
 class Announcement(Base):
     """Class to store a messages sent by the contest managers to all

@@ -1,3 +1,12 @@
+      <tr>
+        <td>
+          <span class="info" title="group name shown in ranking"></span>
+          Display name
+        </td>
+        <td>
+          <input type="text" name="display_name" value="{{ group.display_name or "" }}"/>
+        </td>
+      </tr>
       <tr><td colspan=2><h2>Contest time</h2></td></tr>
       <tr>
         <td>
@@ -53,4 +62,23 @@
           Analysis mode end time (in UTC)
         </td>
         <td><input type="text" name="analysis_stop" value="{{ group.analysis_stop }}"></td>
+      </tr>
+      <tr><td colspan=2><h2>Scoring settings</h2></td></tr>
+      <tr>
+        <td>
+          <span class="info" title="Valid values: 'sum' to simply add points on each task, 'top_n' to add points of best N tasks."></span>
+          Score type
+        </td>
+        <td>
+          <input type="text" name="score_type" value="{{ group.score_type }}"/>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <span class="info" title="JSON data. For 'sum', ignored. For 'top_n', must be the number of tasks to include."></span>
+          Parameters
+        </td>
+        <td>
+          <input type="text" name="score_type_parameters" value="{{ group.score_type_parameters|tojson }}"/>
+        </td>
       </tr>

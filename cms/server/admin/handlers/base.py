@@ -671,6 +671,12 @@ class BaseHandler(CommonRequestHandler):
         self.get_bool(attrs, "analysis_enabled")
         self.get_datetime(attrs, "analysis_start")
         self.get_datetime(attrs, "analysis_stop")
+
+        self.get_string(attrs, "display_name", None)
+        self.get_string(attrs, "score_type")
+        params = self.get_argument("score_type_parameters", None) or "null"
+        attrs["score_type_parameters"] = json.loads(params)
+
         g.set_attrs(attrs)
 
 class FileHandler(BaseHandler, FileHandlerMixin):

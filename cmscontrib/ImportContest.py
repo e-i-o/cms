@@ -367,11 +367,14 @@ class ContestImporter:
         # Create new group and attach it to the contest
         args = {
             "name": new_g.name,
+            "display_name": new_g.display_name,
             "start": new_g.start,
             "stop": new_g.stop,
             "analysis_enabled": new_g.analysis_enabled,
             "analysis_start": new_g.analysis_start,
             "analysis_stop": new_g.analysis_stop,
+            "score_type": new_g.score_type,
+            "score_type_parameters": new_g.score_type_parameters,
         }
         if new_g.per_user_time is not None:
             args["per_user_time"] = new_g.per_user_time

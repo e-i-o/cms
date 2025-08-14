@@ -46,7 +46,7 @@ import typing
 if typing.TYPE_CHECKING:
     from cms.grading.scoretypes import ScoreType
     from cms.grading.tasktypes import TaskType
-    from . import Submission, UserTest
+    from . import Submission, UserTest, Participation
 
 
 class Task(Base):
@@ -241,6 +241,12 @@ class Task(Base):
         # this relationship.
         post_update=True)
 
+    # The (space-separated list of) user groups the task is shown to.
+    groups: str | None = Column(
+        String,
+        CheckConstraint("groups != ''"),
+        nullable=True)
+
     # These one-to-many relationships are the reversed directions of
     # the ones defined in the "child" classes using foreign keys.
 
@@ -293,6 +299,13 @@ class Task(Base):
 
         # Otherwise, use contest language restrictions
         return self.contest.languages if self.contest else None
+
+    def visible_for(self, participation: "Participation | None"):
+        return (
+            participation is None
+            or self.groups is None
+            or participation.group.name in self.groups.split()
+        )
 
 
 class Statement(Base):

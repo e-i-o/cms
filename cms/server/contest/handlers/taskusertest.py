@@ -85,7 +85,8 @@ class UserTestInterfaceHandler(ContestHandler):
             user_tests_left_contest = \
                 self.contest.max_user_test_number - user_test_c
 
-        for task in self.contest.tasks:
+        tasks = list(self.contest.tasks_for(participation))
+        for task in tasks:
             if self.get_argument("task_name", None) == task.name:
                 default_task = task
             user_tests[task.id] = self.sql_session.query(UserTest)\
@@ -108,8 +109,8 @@ class UserTestInterfaceHandler(ContestHandler):
             if user_tests_left[task.id] is not None:
                 user_tests_left[task.id] = max(0, user_tests_left[task.id])
 
-        if default_task is None and len(self.contest.tasks) > 0:
-            default_task = self.contest.tasks[0]
+        if default_task is None and len(tasks) > 0:
+            default_task = tasks[0]
 
         self.render("test_interface.html", default_task=default_task,
                     user_tests=user_tests, user_tests_left=user_tests_left,

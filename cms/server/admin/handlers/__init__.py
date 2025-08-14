@@ -170,8 +170,8 @@ HANDLERS = [
 
     # Contest's ranking
 
-    (r"/contest/([0-9]+)/ranking", RankingHandler),
     (r"/contest/([0-9]+)/ranking/([a-z]+)", RankingHandler),
+    (r"/contest/([0-9]+)/ranking/([a-z]+)/group/([A-Za-z0-9_-]+)", RankingHandler),
 
     # Tasks
 

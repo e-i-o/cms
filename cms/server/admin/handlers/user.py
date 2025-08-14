@@ -462,7 +462,8 @@ class GroupListHandler(SimpleContestHandler("groups.html")):
             return
 
         self.sql_session.delete(group)
-        self.try_commit()
+        if self.try_commit():
+            self.service.proxy_service.reinitialize()
 
 
 class AddGroupHandler(BaseHandler):
@@ -485,7 +486,7 @@ class AddGroupHandler(BaseHandler):
             
             for key in ["start", "stop", "analysis_enabled", 
                         "analysis_start", "analysis_stop", 
-                        "per_user_time"]:
+                        "per_user_time", "display_name", "score_type", "score_type_parameters"]:
                 attrs[key] = getattr(attrs["contest"].main_group, key)
 
             # Create the group.
@@ -498,7 +499,10 @@ class AddGroupHandler(BaseHandler):
             self.redirect(fallback_page)
             return
 
-        self.try_commit()
+        if self.try_commit():
+            # Create the group on RWS.
+            self.service.proxy_service.reinitialize()
+
         self.redirect(self.url("contest", contest_id,
                                "group", group.id, "edit"))
 

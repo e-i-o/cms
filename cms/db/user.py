@@ -31,7 +31,7 @@
 from datetime import datetime, timedelta
 from ipaddress import IPv4Network, IPv6Network
 
-from sqlalchemy.dialects.postgresql import ARRAY, CIDR
+from sqlalchemy.dialects.postgresql import ARRAY, CIDR, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.schema import Column, ForeignKey, CheckConstraint, \
     UniqueConstraint, ForeignKeyConstraint
@@ -66,6 +66,20 @@ class Group(Base):
     name: str = Column(
         Unicode,
         nullable=False)
+
+    # Pretty name of the group (if NULL, then group isn't shown in RWS)
+    display_name: str | None = Column(Unicode, nullable=True)
+
+    # Score type for the contest (how to aggregate task scores into contest
+    # score).
+    score_type: str = Column(
+        String,
+        nullable=False,
+        default="sum")
+
+    # Parameters for the score type, if any.
+    score_type_parameters: object = Column(
+        JSONB)
 
     # Beginning and ending of the contest.
     start: datetime = Column(

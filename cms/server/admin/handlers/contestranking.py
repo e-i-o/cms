@@ -31,7 +31,7 @@ import io
 
 from sqlalchemy.orm import joinedload
 
-from cms.db import Contest
+from cms.db import Contest, Group
 from cms.grading.scoring import task_score
 from .base import BaseHandler, require_permission
 
@@ -41,7 +41,7 @@ class RankingHandler(BaseHandler):
 
     """
     @require_permission(BaseHandler.AUTHENTICATED)
-    def get(self, contest_id, format="online"):
+    def get(self, contest_id, format, group: str | None = None):
         # This validates the contest id.
         self.safe_get_item(Contest, contest_id)
 
@@ -57,33 +57,75 @@ class RankingHandler(BaseHandler):
             .first()
         )
 
+        score_type = "sum"
+        score_params = None
+        if group is not None:
+            group_obj = (
+                self.sql_session.query(Group)
+                .filter(Group.contest_id == contest_id)
+                .filter(Group.name == group)
+                .first()
+            )
+            if group_obj is not None:
+                score_type = group_obj.score_type
+                score_params = group_obj.score_type_parameters
+
         # Preprocess participations: get data about teams, scores
         show_teams = False
+        show_tasks = []
+        show_participants = []
+        for task in self.contest.tasks:
+            if group is None or task.groups is None or group in task.groups.split():
+                show_tasks.append(task)
+
         for p in self.contest.participations:
+            if group is not None and p.group.name != group:
+                continue
+            if p.hidden:
+                continue
             show_teams = show_teams or p.team_id
 
             p.scores = []
             total_score = 0.0
             partial = False
-            for task in self.contest.tasks:
+            score_nums = []
+            for task in show_tasks:
                 t_score, t_partial = task_score(p, task)
-                p.scores.append((t_score, t_partial))
-                total_score += t_score
+                score_nums.append(t_score)
+                t_score_fmt = f"{t_score:.{task.score_precision}f}"
+                p.scores.append((t_score_fmt, t_partial))
                 partial = partial or t_partial
+
+            if score_type == "top_n":
+                sorted_scores = sorted(score_nums, reverse=True)
+                total_score = sum(sorted_scores[:score_params])
+            else:
+                total_score = sum(score_nums)
+
             total_score = round(total_score, self.contest.score_precision)
             p.total_score = (total_score, partial)
+            show_participants.append(p)
+
+        show_participants.sort(key=lambda p: p.total_score, reverse=True)
 
         self.r_params = self.render_params()
         self.r_params["show_teams"] = show_teams
+        self.r_params["show_tasks"] = show_tasks
+        self.r_params["show_participants"] = show_participants
+        self.r_params["download_link_suffix"] = []
+        attachment_basename = "ranking"
+        if group is not None:
+            self.r_params["download_link_suffix"] = ["group", group]
+            attachment_basename = "ranking_" + group
         if format == "txt":
             self.set_header("Content-Type", "text/plain")
             self.set_header("Content-Disposition",
-                            "attachment; filename=\"ranking.txt\"")
+                            f"attachment; filename=\"{attachment_basename}.txt\"")
             self.render("ranking.txt", **self.r_params)
         elif format == "csv":
             self.set_header("Content-Type", "text/csv")
             self.set_header("Content-Disposition",
-                            "attachment; filename=\"ranking.csv\"")
+                            f"attachment; filename=\"{attachment_basename}.csv\"")
 
             output = io.StringIO()  # untested
             writer = csv.writer(output)
@@ -95,7 +137,7 @@ class RankingHandler(BaseHandler):
             row = ["Username", "User"]
             if show_teams:
                 row.append("Team")
-            for task in contest.tasks:
+            for task in show_tasks:
                 row.append(task.name)
                 if include_partial:
                     row.append("P")
@@ -106,16 +148,12 @@ class RankingHandler(BaseHandler):
 
             writer.writerow(row)
 
-            for p in sorted(contest.participations,
-                            key=lambda p: p.total_score, reverse=True):
-                if p.hidden:
-                    continue
+            for p in show_participants:
 
                 row = [p.user.username,
                        "%s %s" % (p.user.first_name, p.user.last_name)]
                 if show_teams:
                     row.append(p.team.name if p.team else "")
-                assert len(contest.tasks) == len(p.scores)
                 for t_score, t_partial in p.scores:  # Custom field, see above
                     row.append(t_score)
                     if include_partial:

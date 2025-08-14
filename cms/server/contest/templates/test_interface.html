@@ -5,7 +5,7 @@
 {% block additional_js %}
 // Define TASK_LANGUAGES for task-specific language filtering
 var TASK_LANGUAGES = {
-{% for task in contest.tasks %}
+{% for task in contest.tasks_for(participation) %}
   '{{ task.name }}': {
     {% for lang in task.get_allowed_languages() or [] %}
       '{{ lang }}': {
@@ -88,7 +88,7 @@ $(document).ready(function () {
 
 
 <ul class="nav nav-tabs">
-{% for task in contest.tasks %}
+{% for task in contest.tasks_for(participation) %}
     {% set task_type = get_task_type(dataset=task.active_dataset) %}
     {% if task_type.testable %}
     <li{% if task == default_task %} class="active"{% endif %}><a href="#test_{{ task.name }}" data-toggle="tab">{{ task.name }}</a></li>
@@ -97,7 +97,7 @@ $(document).ready(function () {
 </ul>
 
 <div class="tab-content">
-{% for task in contest.tasks %}
+{% for task in contest.tasks_for(participation) %}
     {% set task_type = get_task_type(dataset=task.active_dataset) %}
     {% if task_type.testable %}
 <div class="tab-pane{% if task == default_task %} active{% endif %}" id="test_{{ task.name }}">
