@@ -41,6 +41,7 @@ from cms import (
     FEEDBACK_LEVEL_OI_RESTRICTED,
 )
 from cms.db import SubmissionResult
+from cms.grading.languagemanager import get_language
 from cms.grading.steps import EVALUATION_MESSAGES
 from cms.locale import Translation, DEFAULT_TRANSLATION
 from cms.server.jinja2_toolbox import GLOBAL_ENVIRONMENT
@@ -570,13 +571,21 @@ class ScoreTypeGroup(ScoreTypeAlone):
                 ]:
                     time_limit_was_exceeded = True
 
+                dataset = evaluations[tc_idx].dataset
+                time_limit = dataset.time_limit
+                sub_lang = submission_result.submission.language
+                if dataset.time_limit_interpreted is not None and sub_lang is not None:
+                    lang = get_language(sub_lang)
+                    if lang.is_interpreted:
+                        time_limit = dataset.time_limit_interpreted
+
                 testcases.append(
                     {
                         "idx": tc_idx,
                         "outcome": tc_outcome,
                         "text": evaluations[tc_idx].text,
                         "time": evaluations[tc_idx].execution_time,
-                        "time_limit": evaluations[tc_idx].dataset.time_limit,
+                        "time_limit": time_limit,
                         "time_limit_was_exceeded": time_limit_was_exceeded,
                         "memory": evaluations[tc_idx].execution_memory,
                         "show_in_restricted_feedback": self.public_testcases[tc_idx],

@@ -46,6 +46,11 @@ class Python3PyPy(CompiledLanguage):
         return [".py"]
 
     @property
+    def is_interpreted(self):
+        """See Language.is_interpreted."""
+        return True
+
+    @property
     def executable_extension(self):
         """See Language.executable.extension."""
         # Defined in PEP 441 (https://www.python.org/dev/peps/pep-0441/).

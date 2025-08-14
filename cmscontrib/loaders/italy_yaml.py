@@ -627,6 +627,7 @@ class YamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
         args["autojudge"] = False
 
         load(conf, args, ["time_limit", "timeout"], conv=float)
+        load(conf, args, ["time_limit_interpreted"], conv=float)
         # The Italian YAML format specifies memory limits in MiB.
         load(conf, args, ["memory_limit", "memlimit"],
              conv=lambda mb: mb * 1024 * 1024)
@@ -888,6 +889,7 @@ class YamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
         elif output_only:
             args["task_type"] = "OutputOnly"
             args["time_limit"] = None
+            args["time_limit_interpreted"] = None
             args["memory_limit"] = None
             args["task_type_parameters"] = [evaluation_param]
             task.submission_format = ["output_%03d.txt" % i for i in range(n_input)]
