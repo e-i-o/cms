@@ -220,3 +220,11 @@ listen_port = 8811
 #bot_token = "..."
 #chat_id = "..."
 
+# Uncomment this section to send questions and announcements to the specified matrix room.
+#[matrix_bot]
+# Access token for matrix account
+#token = "syt_aAAaAaAAAaaaaAaaaAAAAAAaaAaAaAA_AaAaaAAAaAAAAAaaaaaa_aAaAaa"
+# Matrix room ID (visible in "Advanced settings" menu) which notifications are sent to
+#room_id = "!AAAaAAAaAaaaaAAAAa:matrix.org"
+# Homeserver of the matrix bot account
+#homeserver = "https://matrix.org"

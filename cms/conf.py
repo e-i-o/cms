@@ -168,6 +168,12 @@ class TelegramBotConfig:
     bot_token: str
     chat_id: str
 
+@dataclass()
+class MatrixBotConfig:
+    token: str
+    room_id: str
+    homeserver: str
+
 
 field_helper = lambda T: dataclasses.field(default_factory=T)
 
@@ -189,6 +195,7 @@ class Config:
     printing: PrintingServiceConfig = field_helper(PrintingServiceConfig)
     prometheus: PrometheusConfig = field_helper(PrometheusConfig)
     telegram_bot: TelegramBotConfig | None = None
+    matrix_bot: MatrixBotConfig | None = None
     # This is the one that will be provided in the config file.
     services_: dict[str, list[tuple[str, int]]]
     # And this is the one we want to use inside CMS.
