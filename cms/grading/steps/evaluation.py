@@ -56,27 +56,33 @@ EVALUATION_MESSAGES = MessageCollection([
     HumanMessage("nooutput",
                  N_("Evaluation didn't produce file %s"),
                  N_("Your submission ran, but did not write on the "
-                    "correct output file")),
+                    "correct output file"),
+                 inline_help=True),
     HumanMessage("timeout",
                  N_("Execution timed out"),
-                 N_("Your submission used too much CPU time.")),
+                 N_("Your submission used too much CPU time."),
+                 inline_help=True),
     HumanMessage("walltimeout",
                  N_("Execution timed out (wall clock limit exceeded)"),
                  N_("Your submission used too much total time. This might "
                     "be triggered by undefined code, or buffer overflow, "
                     "for example. Note that in this case the CPU time "
                     "visible in the submission details might be much smaller "
-                    "than the time limit.")),
+                    "than the time limit."),
+                 inline_help=True),
     HumanMessage("memorylimit",
                  N_("Memory limit exceeded"),
-                 N_("Your submission used too much memory.")),
+                 N_("Your submission used too much memory."),
+                 inline_help=True),
     HumanMessage("signal",
                  N_("Execution killed by signal"),
-                 N_("The evaluation was killed by a signal.")),
+                 N_("The evaluation was killed by a signal."),
+                 inline_help=True),
     HumanMessage("returncode",
                  N_("Execution failed because the return code was nonzero"),
                  N_("Your submission failed because it exited with a return "
-                    "code different from 0.")),
+                    "code different from 0."),
+                 inline_help=True),
 ])
 
 

@@ -37,17 +37,19 @@ class HumanMessage:
 
     """
 
-    def __init__(self, shorthand: str, message: str, help_text: str):
+    def __init__(self, shorthand: str, message: str, help_text: str, inline_help: bool = False):
         """Initialization.
 
         shorthand: what to call this message in the code.
         message: the message itself.
         help_text: a longer explanation for the help page.
+        inline_help: whether to show the help text in the web UI as a tooltip.
 
         """
         self.shorthand = shorthand
         self.message = message
         self.help_text = help_text
+        self.inline_help = inline_help
 
 
 class MessageCollection:
