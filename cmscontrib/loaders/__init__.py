@@ -23,11 +23,23 @@ from .italy_yaml import YamlLoader
 from .polygon import PolygonTaskLoader, PolygonUserLoader, PolygonContestLoader
 from .tps import TpsTaskLoader
 
+# Compatibility alias:
+# estonia_yaml used to be copypasted from italy_yaml, but the duplication was
+# annoying to manage. so i just put all of our changes into italy_yaml itself.
+# we won't need to import any fancy italian contests anyways, and it still
+# copes with con_test :)
+class EstYamlLoader(YamlLoader):
+    short_name = 'estonia_yaml'
+    description = 'Estonian YAML-based format (based on Italy)'
+    @staticmethod
+    def detect(path):
+        return False
 
 LOADERS: dict[str, type[BaseLoader]] = dict(
     (loader_class.short_name, loader_class)
     for loader_class in [
         YamlLoader,
+        EstYamlLoader,
         PolygonTaskLoader,
         PolygonUserLoader,
         PolygonContestLoader,
