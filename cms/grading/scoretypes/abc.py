@@ -478,6 +478,7 @@ class ScoreTypeGroup(ScoreTypeAlone):
                 parameter)
             st_score = st_score_fraction * parameter[0]
             rounded_score = round(st_score, score_precision)
+            st_score = rounded_score
 
             if tc_first_lowest_idx is not None and st_score_fraction < 1.0:
                 for tc in testcases:
@@ -505,7 +506,11 @@ class ScoreTypeGroup(ScoreTypeAlone):
             else:
                 public_subtasks.append({"idx": st_idx,
                                         "testcases": public_testcases})
-            ranking_details.append("%g" % st_score)
+            ranking_details.append(str(st_score))
+
+        # get rid of floating point errors
+        score = round(score, score_precision)
+        public_score = round(public_score, score_precision)
 
         return score, subtasks, public_score, public_subtasks, ranking_details
 
