@@ -61,6 +61,15 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     sed -i 's@^cg_root .*@cg_root = /sys/fs/cgroup@' /etc/isolate
 EOF
 
+# Install newer pypy
+RUN <<EOF
+#!/bin/bash -ex
+    curl https://downloads.python.org/pypy/pypy3.11-v7.3.20-linux64.tar.bz2 -o /tmp/pypy.tar.bz2
+    tar -xf /tmp/pypy.tar.bz2 -C /opt
+    rm /tmp/pypy.tar.bz2
+    ln -s /opt/pypy3.11-v7.3.20-linux64 /opt/pypy3
+EOF
+
 # Create cmsuser user with sudo privileges and access to isolate
 RUN <<EOF
 #!/bin/bash -ex
