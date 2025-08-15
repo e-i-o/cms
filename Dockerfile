@@ -74,8 +74,9 @@ RUN <<EOF
 #!/bin/bash -ex
     # Need to set user ID manually: otherwise it'd be 1000 on debian
     # and 1001 on ubuntu.
+    groupadd -g 1001 cmsuser
     # 1001 is taken by `isolate`.
-    useradd -ms /bin/bash -u 2000 cmsuser
+    useradd -ms /bin/bash -u 2000 -g 1001 cmsuser
     usermod -aG sudo cmsuser
     usermod -aG isolate cmsuser
     # Disable sudo password
