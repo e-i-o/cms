@@ -63,7 +63,7 @@ class Python3PyPy(CompiledLanguage):
 
         commands = []
         files_to_package = []
-        commands.append(["/usr/bin/pypy3", "-m", "compileall", "-b", "."])
+        commands.append(["/opt/pypy3/bin/pypy3", "-m", "compileall", "-b", "."])
         for idx, source_filename in enumerate(source_filenames):
             basename = os.path.splitext(os.path.basename(source_filename))[0]
             pyc_filename = "%s.pyc" % basename
@@ -83,4 +83,4 @@ class Python3PyPy(CompiledLanguage):
             self, executable_filename, main=None, args=None):
         """See Language.get_evaluation_commands."""
         args = args if args is not None else []
-        return [["/usr/bin/pypy3", executable_filename] + args]
+        return [["/opt/pypy3/bin/pypy3", executable_filename] + args]
