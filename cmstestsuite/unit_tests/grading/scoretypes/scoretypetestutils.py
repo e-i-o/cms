@@ -29,7 +29,7 @@ class ScoreTypeTestMixin:
         self.assertEqual([{"idx": s["idx"]} for s in scores[1]],
                          subtasks)
         self.assertAlmostEqual(scores[2], public)
-        self.assertEqual(scores[4], [str(score) for score in rws_scores])
+        self.assertEqual(scores[4], [str(float(score)) for score in rws_scores])
 
     @staticmethod
     def get_submission_result(testcases):

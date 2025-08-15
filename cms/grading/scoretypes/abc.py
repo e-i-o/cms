@@ -658,12 +658,13 @@ class ScoreTypeGroup(ScoreTypeAlone):
                 public_subtasks.append(subtasks[-1])
             else:
                 public_subtasks.append({"idx": st_idx, "testcases": public_testcases})
-            ranking_details.append("%g" % rounded_score)
+            ranking_details.append(str(rounded_score))
 
         # The following line should be unnecessary since subtask scores
         # are rounded. However we are using floats not Decimals
         # and this can cause errors. So we round again to be sure.
         score = round(score, score_precision)
+        public_score = round(public_score, score_precision)
 
         return score, subtasks, public_score, public_subtasks, ranking_details
 
