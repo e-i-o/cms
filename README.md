@@ -1,6 +1,32 @@
 Contest Management System
 =========================
 
+This is a fork of CMS as used in Estonian informatics olympiads. We periodically rebase all of our patches on top of the upstream repo. Each commit on this branch should be one "change". Fixup commits must clearly indicate which change they are meant to be a part of.
+
+`eio` is the development branch, any pushes will automatically build the `ghcr.io/e-i-o/cms:test` docker image. `eio-prod` is the production branch, any pushes will build the `ghcr.io/e-i-o/cms:prod` docker image.
+
+Making changes: Preferably fix the tests if they fail (use docker/cms-test.sh). The docker image should get pushed even when tests fail though.
+
+When changing translatable strings:
+
+1. Edit the string in CMS code.
+2. Run `./setup.py extract_messages`.
+3. Undo the unnecessary modifications to the file header of cms/locale/cms.pot (this should only be the generation date changing). This prevents merge conflicts when rebasing later.
+4. Run `./setup.py update_catalog -l et` and `./setup.py update_catalog -l ru`.
+5. Again, undo the changes to the file headers (and possibly footers) of the .po files.
+6. Add your translations to the .po files.
+
+When only changing the translations, not the source strings, it's preferable to [submit the changes upstream](https://hosted.weblate.org/engage/cms/) instead if possible.
+
+Rebase procedure:
+
+1. Make a new tag from the `eio` branch, named something like `eio-2025-02` (for keeping history).
+2. Squash any fixup commits into their respective change commits.
+3. Rebase on top of upstream main, remove any now-unnecessary patches. (Depending on circumstances, it might be easier to cherry-pick all patches that are worth keeping instead.)
+4. Force push :)
+
+Original readme follows:
+
 Homepage: <http://cms-dev.github.io/>
 
 [![Build Status](https://github.com/cms-dev/cms/actions/workflows/main.yml/badge.svg)](https://github.com/cms-dev/cms/actions)
