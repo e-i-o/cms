@@ -116,17 +116,17 @@ msgstr "Mälulimiit ületatud"
 msgid "Your submission used too much memory."
 msgstr "Lahendus kasutas liiga palju mälu."
 
-msgid "Execution killed by signal"
-msgstr "Programmi täitmine katkes signaali tagajärjel"
+msgid "Runtime error (killed by signal)"
+msgstr "Viga programmi täitmisel (katkes signaali tagajärjel)"
 
-msgid "The evaluation was killed by a signal."
-msgstr "Lahenduse täitmine katkes signaali tagajärjel."
+msgid "The evaluation was killed by a signal. This could be caused by an invalid memory access, accessing arrays out of bounds, or other kinds of undefined behavior."
+msgstr "Lahenduse täitmine katkes signaali tagajärjel. See võib olla tingitud vigasest mälukasutusest, massiivi piiridest väljumisest või muud sorti määramatustest."
 
-msgid "Execution failed because the return code was nonzero"
-msgstr "Programmi täitmine ebaõnnestus, nullist erinev veakood"
+msgid "Runtime error (return code was nonzero)"
+msgstr "Viga programmi täitmisel (nullist erinev veakood)"
 
-msgid "Your submission failed because it exited with a return code different from 0."
-msgstr "Lahendus loeti ebaõnnestunuks, kuna selle jooksmine lõppes nullist erineva veakoodiga."
+msgid "Your submission failed because it exited with a return code different from 0. Among others, a possible cause is your program being terminated by an unhandled exception."
+msgstr "Programmi täitmine loeti ebaõnnestunuks, sest see lõppes nullist erineva veakoodiga. Selle üks võimalik põhjus on programmi töö lõppemine erindi (exception) tagajärjel."
 
 msgid "Execution completed successfully"
 msgstr "Prorammi täitmine õnnestus"
