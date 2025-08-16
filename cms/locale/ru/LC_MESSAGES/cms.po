@@ -545,8 +545,12 @@ msgstr ""
 msgid "Programming languages and libraries"
 msgstr "Языки программирования и библиотеки"
 
-msgid "The main Java class of the solution should have exactly the same name as the task."
+#, fuzzy
+msgid "The main class (the class containing the <tt>main</tt> method) must have exactly the same name (and in the same case) as the task."
 msgstr "Главный класс решений на Java должен называться так же, как и задача."
+
+msgid "The main class must be in the default package (the source file must not contain the <tt>package</tt> keyword)."
+msgstr ""
 
 msgid "Submission details for compilation"
 msgstr "Подробности компиляции посылки"

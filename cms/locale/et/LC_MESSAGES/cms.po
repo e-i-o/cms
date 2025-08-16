@@ -530,8 +530,11 @@ msgstr "Vali võistlus"
 msgid "Programming languages and libraries"
 msgstr "Programmeerimiskeeled ja teegid"
 
-msgid "The main Java class of the solution should have exactly the same name as the task."
-msgstr "Java lahenduse peaklass peaks olema sama nimega kui ülesanne."
+msgid "The main class (the class containing the <tt>main</tt> method) must have exactly the same name (and in the same case) as the task."
+msgstr "Java lahenduse peaklass (s.t. klass, milles on <tt>main</tt> meetod) peab olema sama nimega kui ülesanne (sh. suurtähti arvestades)."
+
+msgid "The main class must be in the default package (the source file must not contain the <tt>package</tt> keyword)."
+msgstr "Peaklass peab asuma vaikepaketis (s.t. lahendus ei tohi kasutada <tt>package</tt> võtmesõna)."
 
 msgid "Submission details for compilation"
 msgstr "Kompileerimisel esinevad teated"
