@@ -119,17 +119,17 @@ msgid "Your submission used too much memory."
 msgstr "Ваша посылка использовала слишком много процессорного времени."
 
 #, fuzzy
-msgid "Execution killed by signal"
+msgid "Runtime error (killed by signal)"
 msgstr "Превышено процессорное время выполнения"
 
-msgid "The evaluation was killed by a signal."
+msgid "The evaluation was killed by a signal. This could be caused by an invalid memory access, accessing arrays out of bounds, or other kinds of undefined behavior."
 msgstr ""
 
-msgid "Execution failed because the return code was nonzero"
+msgid "Runtime error (return code was nonzero)"
 msgstr "Ошибка во время выполнения программы"
 
-msgid "Your submission failed because it exited with a return code different from 0."
-msgstr "Ваша решение выдало ненулевой код завершения. Это могло быть вызвано ошибкой в коде."
+msgid "Your submission failed because it exited with a return code different from 0. Among others, a possible cause is your program being terminated by an unhandled exception."
+msgstr "Ваша решение выдало ненулевой код завершения. Среди прочих возможных причин — завершение работы программы из-за необработанного исключения (exception)."
 
 msgid "Execution completed successfully"
 msgstr "Выполнение успешно завершилось"

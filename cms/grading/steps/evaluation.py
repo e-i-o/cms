@@ -75,13 +75,16 @@ EVALUATION_MESSAGES = MessageCollection([
                  N_("Your submission used too much memory."),
                  inline_help=True),
     HumanMessage("signal",
-                 N_("Execution killed by signal"),
-                 N_("The evaluation was killed by a signal."),
+                 N_("Runtime error (killed by signal)"),
+                 N_("The evaluation was killed by a signal. This could be "
+                    "caused by an invalid memory access, accessing arrays out "
+                    "of bounds, or other kinds of undefined behavior."),
                  inline_help=True),
     HumanMessage("returncode",
-                 N_("Execution failed because the return code was nonzero"),
+                 N_("Runtime error (return code was nonzero)"),
                  N_("Your submission failed because it exited with a return "
-                    "code different from 0."),
+                    "code different from 0. Among others, a possible cause is "
+                    "your program being terminated by an unhandled exception."),
                  inline_help=True),
 ])
 
