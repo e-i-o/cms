@@ -412,6 +412,10 @@ abbr {
     display: none;
 }
 
+#Scoreboard .user_id {
+    display: none;
+}
+
 #Scoreboard_head tr {
     height: 2.5em;
 }
