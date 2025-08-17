@@ -23,6 +23,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from dataclasses import dataclass
 import logging
 import os
 import os.path
@@ -142,6 +143,56 @@ def parse_datetime(val):
 def make_timedelta(t):
     return timedelta(seconds=t)
 
+
+def parse_subtask_deps(subtasks: list[tuple]):
+    @dataclass
+    class Subtask:
+        name: str | None
+        deps: list[str]
+        points: int
+        testcases: list[str]
+        params: list
+
+    st_by_name: dict[str, Subtask] = {}
+    all_subtasks: list[Subtask] = []
+    start_ind = 0
+    for st in subtasks:
+        st_name = None
+        st_deps = []
+        other_params = []
+        for param in st[2:]:
+            if ":" not in param:
+                other_params.append(param)
+            k, v = param.split(":", 1)
+            if k == "name":
+                st_name = v
+            elif k == "deps":
+                st_deps = v.split(",")
+            else:
+                other_params.append(param)
+        tcs = [f"{x:03d}" for x in range(start_ind, start_ind+st[1])]
+        start_ind += st[1]
+        subtask = Subtask(name=st_name, deps=st_deps, points=st[0], testcases=tcs, params=other_params)
+        all_subtasks.append(subtask)
+        if subtask.name is not None:
+            st_by_name[subtask.name] = subtask
+
+    if len(st_by_name) == 0:
+        # No dependencies specified; use the original subtask settings.
+        return subtasks
+
+    new_subtasks = []
+    for st in all_subtasks:
+        all_tcs = st.testcases.copy()
+        for dep in st.deps:
+            assert dep in st_by_name, f"Subtask {st.name}'s dependency {dep} was not found!"
+            dep_st = st_by_name[dep]
+            all_tcs += dep_st.testcases
+        all_tcs.sort()
+        tc_regex = "^" + "|".join(all_tcs) + "$"
+        new_st = (st.points, tc_regex, *st.params)
+        new_subtasks.append(new_st)
+    return new_subtasks
 
 class YamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
     """Load a contest, task, user or team stored using the Italian IOI format.
@@ -767,12 +818,15 @@ class YamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
                     n_input = sum([int(st[1]) for st in subtasks])
                     if "score_type" not in args:
                         args["score_type"] = "GroupMin"
+                    if args["score_type"] == "GroupMinDeps":
+                        # compatibility alias; deps work in all score types now
+                        args["score_type"] = "GroupMin"
                     assert args["score_type"].startswith("Group")
                     if args["score_type"] == "GroupSumCond":
                         for st in subtasks:
                             assert len(st) >= 3
                             assert st[2] in ["E", "U", "C"]
-                    args["score_type_parameters"] = subtasks
+                    args["score_type_parameters"] = parse_subtask_deps(subtasks)
 
                 if "n_input" in conf:
                     assert int(conf['n_input']) == n_input
