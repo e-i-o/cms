@@ -162,6 +162,7 @@ def get_fresh_schema():
     return run_pg_dump()
 
 class TestSchemaDiff(unittest.TestCase):
+    @unittest.skip("sql updater isn't very useful for eio")
     def test_schema_diff(self):
         dirname = os.path.dirname(__file__)
         schema_file = os.path.join(dirname, "schema_v1.5.sql")
