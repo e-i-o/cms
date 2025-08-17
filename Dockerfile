@@ -3,6 +3,8 @@
 ARG BASE_IMAGE=ubuntu:noble
 FROM ${BASE_IMAGE}
 
+LABEL org.opencontainers.image.source=https://github.com/e-i-o/cms
+
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked <<EOF
 #!/bin/bash -ex
