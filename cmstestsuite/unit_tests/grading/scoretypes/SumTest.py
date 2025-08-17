@@ -105,7 +105,7 @@ class TestSum(ScoreTypeTestMixin, unittest.TestCase):
 
         st = Sum(10, self._public_testcases, 2)
         sr = self.get_submission_result(self._public_testcases)
-        _, testcases, _, _, _ = st.compute_score(sr)
+        _, testcases, _, _, _, _ = st.compute_score(sr)
 
         full = st.get_json_details(testcases, FEEDBACK_LEVEL_FULL)
         self.assertEqual(len(full), 4)
@@ -122,7 +122,7 @@ class TestSum(ScoreTypeTestMixin, unittest.TestCase):
 
         st = Sum(10, self._public_testcases, 2)
         sr = self.get_submission_result(self._public_testcases)
-        _, testcases, _, _, _ = st.compute_score(sr)
+        _, testcases, _, _, _, _ = st.compute_score(sr)
 
         html_full = st.get_html_details(testcases, FEEDBACK_LEVEL_FULL)
         self.assertIn("execution-time", html_full)

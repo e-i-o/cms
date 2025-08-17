@@ -717,7 +717,7 @@ td.token_rules p:last-child {
 }
 
 #submission_detail table.testcase-list thead th.outcome {
-    width: 15%;
+    width: 20%;
 }
 
 #submission_detail table.testcase-list thead th.execution-time,

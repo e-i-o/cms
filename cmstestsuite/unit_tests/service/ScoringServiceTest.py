@@ -47,7 +47,7 @@ class TestScoringService(DatabaseMixin, unittest.TestCase):
 
         self.score_info = (unique_long_id(), unique_long_id(),
                            unique_long_id(), unique_long_id(),
-                           [unique_unicode_id(), unique_unicode_id()])
+                           [unique_unicode_id(), unique_unicode_id()], False)
 
         patcher = patch("cms.db.Dataset.score_type_object",
                         new_callable=PropertyMock)
@@ -100,7 +100,7 @@ class TestScoringService(DatabaseMixin, unittest.TestCase):
         self.session.expire(sr)
         self.assertEqual((sr.score, sr.score_details,
                           sr.public_score, sr.public_score_details,
-                          sr.ranking_score_details),
+                          sr.ranking_score_details, False),
                          self.score_info)
         self.assertIsNotNone(sr.scored_at)
 

@@ -213,7 +213,7 @@ class TestGroupMin(ScoreTypeTestMixin, unittest.TestCase):
         sr = self.get_submission_result(self._public_testcases)
         self.set_outcome(sr, "1_0", 0.0)
         self.set_outcome(sr, "1_1", 0.0)
-        _, subtasks, _, _, _ = gmin.compute_score(sr)
+        _, subtasks, _, _, _, _ = gmin.compute_score(sr)
 
         # FULL feedback level includes all testcases and times/memory
         full = gmin.get_json_details(subtasks, FEEDBACK_LEVEL_FULL)
