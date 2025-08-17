@@ -1,8 +1,9 @@
 name: ci
 
 on:
-  - push
-  - pull_request
+  push:
+    branches: [eio, eio-prod]
+
 
 jobs:
   test:
@@ -10,7 +11,7 @@ jobs:
 
     strategy:
       matrix:
-        base_image: ["ubuntu:noble", "debian:bookworm"]
+        base_image: ["ubuntu:noble"]
 
     steps:
       - uses: actions/checkout@v2
@@ -19,35 +20,27 @@ jobs:
         run: |
           mount | grep cgroup
 
-      - name: Build docker image
+      - name: Set up docker buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to docker
         run: |
-          docker compose -p cms -f docker/docker-compose.test.yml build \
-              --build-arg BASE_IMAGE=${{ matrix.base_image }} testcms
+          docker login --username ${{ github.actor }} --password ${{ secrets.GITHUB_TOKEN }} ghcr.io
+
+      - name: Build and push docker image
+        run: |
+          if [ "$GITHUB_REF_NAME" = "eio-prod" ]; then
+            TAGNAME=prod
+          else
+            TAGNAME=test
+          fi
+          docker buildx build --load --push -t ghcr.io/e-i-o/cms:$TAGNAME . \
+              --cache-from type=registry,ref=ghcr.io/e-i-o/cms:build-cache \
+              --cache-to type=registry,ref=ghcr.io/e-i-o/cms:build-cache \
+              --build-arg BASE_IMAGE=${{ matrix.base_image }}
+          docker tag ghcr.io/e-i-o/cms:$TAGNAME cms-testcms
 
       - name: Run tests
         run: |
           docker compose -p cms -f docker/docker-compose.test.yml run --rm testcms
 
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
-        with:
-          files: ./codecov/junit.xml
-          flags: unittests
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-      - name: Upload unit test coverage results to Codecov
-        uses: codecov/codecov-action@v4
-        if: ${{ !cancelled() }}
-        with:
-          files: ./codecov/unittests.xml
-          flags: unittests
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-      - name: Upload functional test coverage results to Codecov
-        uses: codecov/codecov-action@v4
-        if: ${{ !cancelled() }}
-        with:
-          files: ./codecov/functionaltests.xml
-          flags: functionaltests
-          token: ${{ secrets.CODECOV_TOKEN }}
