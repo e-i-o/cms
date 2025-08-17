@@ -501,6 +501,8 @@ class Dataset(Base):
         JSONB,
         nullable=False)
 
+    relative_scoring: bool = Column(Boolean, nullable=False, default=False)
+
     # These one-to-many relationships are the reversed directions of
     # the ones defined in the "child" classes using foreign keys.
 
@@ -698,3 +700,7 @@ class Testcase(Base):
     output: str = Column(
         Digest,
         nullable=False)
+
+    # Best scores seen for this testcase, if the dataset uses relative scoring.
+    best_official_score: float | None = Column(Float, nullable=True)
+    best_unofficial_score: float | None = Column(Float, nullable=True)

@@ -674,6 +674,7 @@ class YamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
         load(conf, args, ["memory_limit", "memlimit"],
              conv=lambda mb: mb * 1024 * 1024)
         load(conf, args, "score_type")
+        load(conf, args, "relative_scoring")
 
         # Builds the parameters that depend on the task type
         args["managers"] = []

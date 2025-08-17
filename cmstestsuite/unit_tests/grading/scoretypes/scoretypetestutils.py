@@ -40,6 +40,7 @@ class ScoreTypeTestMixin:
             ScoreTypeTestMixin.get_evaluation(codename, 1.0)
             for codename in reversed(sorted(testcases.keys()))]
         sr.submission.task.score_precision = 4
+        sr.dataset.relative_scoring = False
         return sr
 
     @staticmethod

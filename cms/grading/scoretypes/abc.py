@@ -165,7 +165,7 @@ class ScoreType(metaclass=ABCMeta):
     @abstractmethod
     def compute_score(
         self, submission_result: SubmissionResult
-    ) -> tuple[float, object, float, object, list[str]]:
+    ) -> tuple[float, object, float, object, list[str], bool]:
         """Computes a score of a single submission.
 
         submission_result: the submission
@@ -177,6 +177,7 @@ class ScoreType(metaclass=ABCMeta):
             get_html_details, the score and a similar data structure
             from the point of view of a user who did not play a token,
             the list of strings to send to RWS.
+            last bool: invalidate all scores on this dataset (for relative scoring)
 
         """
         pass
@@ -407,13 +408,14 @@ class ScoreTypeGroup(ScoreTypeAlone):
         """See ScoreType.compute_score."""
         # Actually, this means it didn't even compile!
         if not submission_result.evaluated():
-            return 0.0, [], 0.0, [], ["%lg" % 0.0 for _ in self.parameters]
+            return 0.0, [], 0.0, [], ["%lg" % 0.0 for _ in self.parameters], False
 
         score = 0
         subtasks = []
         public_score = 0
         public_subtasks = []
         ranking_details = []
+        invalidate_dataset = False
 
         targets = self.retrieve_target_testcases()
         evaluations = {ev.codename: ev for ev in submission_result.evaluations}
@@ -473,8 +475,31 @@ class ScoreTypeGroup(ScoreTypeAlone):
                 else:
                     public_testcases.append({"idx": tc_idx})
 
+            # Implement relative scoring
+            if submission_result.dataset.relative_scoring:
+                is_official = submission_result.submission.official
+                tc_scores = []
+                for tc_idx in target:
+                    tc_outcome = float(evaluations[tc_idx].outcome)
+                    tc = submission_result.dataset.testcases[tc_idx]
+                    safegt = lambda a,b: b is None or a > b
+                    # hackity hack hack :)
+                    # this will be committed to the DB by the ScoringService who called compute_score
+                    if safegt(tc_outcome, tc.best_unofficial_score):
+                        logger.info(f"new best on tc={tc_idx} outcome={tc_outcome} old={tc.best_unofficial_score}")
+                        tc.best_unofficial_score = tc_outcome
+                        invalidate_dataset = True
+                    if is_official and safegt(tc_outcome, tc.best_official_score):
+                        tc.best_official_score = tc_outcome
+                        invalidate_dataset = True
+                    scaler = tc.best_official_score if is_official else tc.best_unofficial_score
+                    scaler = scaler or 1.0
+                    tc_scores.append(tc_outcome / scaler)
+            else:
+                tc_scores = [float(evaluations[tc_idx].outcome) for tc_idx in target]
+
             st_score_fraction = self.reduce(
-                [float(evaluations[tc_idx].outcome) for tc_idx in target],
+                tc_scores,
                 parameter)
             st_score = st_score_fraction * parameter[0]
             rounded_score = round(st_score, score_precision)
@@ -512,7 +537,7 @@ class ScoreTypeGroup(ScoreTypeAlone):
         score = round(score, score_precision)
         public_score = round(public_score, score_precision)
 
-        return score, subtasks, public_score, public_subtasks, ranking_details
+        return score, subtasks, public_score, public_subtasks, ranking_details, invalidate_dataset
 
     @abstractmethod
     def get_public_outcome(self, outcome: float, parameter: list) -> str:

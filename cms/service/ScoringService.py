@@ -39,9 +39,10 @@ logger = logging.getLogger(__name__)
 
 
 class ScoringExecutor(Executor[ScoringOperation]):
-    def __init__(self, proxy_service):
+    def __init__(self, proxy_service, self_service: "ScoringService"):
         super().__init__()
         self.proxy_service = proxy_service
+        self.service = self_service
 
     def execute(self, entry: QueueEntry[ScoringOperation]):
         """Assign a score to a submission result.
@@ -98,7 +99,8 @@ class ScoringExecutor(Executor[ScoringOperation]):
                 submission_result.score_details, \
                 submission_result.public_score, \
                 submission_result.public_score_details, \
-                submission_result.ranking_score_details = \
+                submission_result.ranking_score_details, \
+                invalidate_dataset = \
                 score_type.compute_score(submission_result)
 
             if submission_result.scored_at is None:
@@ -114,6 +116,9 @@ class ScoringExecutor(Executor[ScoringOperation]):
                     (make_datetime() - submission.timestamp).total_seconds())
                 self.proxy_service.submission_scored(
                     submission_id=submission.id)
+
+            if invalidate_dataset:
+                self.service.invalidate_submission(dataset_id=dataset.id)
 
 
 class ScoringService(TriggeredService[ScoringOperation, ScoringExecutor]):
@@ -141,7 +146,7 @@ class ScoringService(TriggeredService[ScoringOperation, ScoringExecutor]):
             ServiceCoord("ProxyService", 0),
             must_be_present=ranking_enabled)
 
-        self.add_executor(ScoringExecutor(self.proxy_service))
+        self.add_executor(ScoringExecutor(self.proxy_service, self))
         self.start_sweeper(347.0)
 
     def _missing_operations(self):
