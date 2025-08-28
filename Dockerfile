@@ -42,6 +42,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         zip
     )
     apt-get install -y "${PACKAGES[@]}"
+    if grep -q ID=debian /etc/os-release; then
+        apt-get install -y extrepo
+        extrepo enable dotnet
+        apt-get update
+    fi
+    apt-get install -y dotnet-sdk-8.0
 EOF
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
