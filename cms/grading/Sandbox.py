@@ -928,6 +928,7 @@ class IsolateSandbox(SandboxBase):
         self.stdin_file: str | None = None  # -i
         self.stack_space: int | None = None  # -k
         self.address_space: int | None = None  # -m
+        self.open_files: int | None = 64  # -n
         self.stdout_file: str | None = None  # -o
         self.stderr_file: str | None = None  # -r
         self.timeout: float | None = None  # -t
@@ -1071,6 +1072,10 @@ class IsolateSandbox(SandboxBase):
             res += ["--processes=%d" % self.max_processes]
         else:
             res += ["--processes"]
+        if self.open_files is not None:
+            res += ["--open-files=%d" % self.open_files]
+        else:
+            res += ["--open-files"]
         if self.stderr_file is not None:
             res += ["--stderr=%s" % self.inner_absolute_path(self.stderr_file)]
         if self.timeout is not None:
