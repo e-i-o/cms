@@ -546,14 +546,17 @@ class YamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
                         "importing the multi-language files only."
                     )
                 statements_to_import = multi_statement_paths
-            else:
+            elif single_statement_path is not None:
                 statements_to_import = {
                     primary_language: single_statement_path}
+            else:
+                statements_to_import = {}
 
             if primary_language not in statements_to_import.keys():
-                logger.critical(
-                    "Couldn't find statement for primary language %s, aborting." % primary_language)
-                sys.exit(1)
+                logger.warning(
+                    "Couldn't find statement for primary language %s."
+                    % primary_language
+                )
 
             args["statements"] = dict()
             for lang_code, statement_path in statements_to_import.items():
