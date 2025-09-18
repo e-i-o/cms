@@ -240,7 +240,7 @@ var Scoreboard = new function () {
     self.make_row = function (user) {
         // See the comment in .make_cols() for the reason we use colspans.
         var result = " \
-<tr class=\"user" + (user["selected"] > 0 ? " selected color" + user["selected"] : "") + "\" data-user=\"" + user["key"] + "\"> \
+            <tr class=\"user" + (user["global"] == 0 ? " row_hidden" : "") + (user["selected"] > 0 ? " selected color" + user["selected"] : "") + "\" data-user=\"" + user["key"] + "\"> \
     <td class=\"sel\"></td> \
     <td class=\"rank\">" + user["rank"] + "</td> \
     <td colspan=\"10\" class=\"f_name\">" + escapeHTML(user["f_name"]) + "</td> \
@@ -327,6 +327,9 @@ var Scoreboard = new function () {
     // Suppose the scoreboard is correctly sorted except for the given user.
     // Move this user (up or down) to put it in their correct position.
     self.move_user = function (user) {
+        // hack: do this here because it's called in all the right places
+        $(user["row"]).toggleClass("row_hidden", user["global"] == 0);
+
         var list = self.user_list;
         var compare = self.compare_users;
 
