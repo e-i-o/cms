@@ -46,6 +46,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         zip
     )
     apt-get install -y "${PACKAGES[@]}"
+    if grep -q ID=debian /etc/os-release; then
+        apt-get install -y extrepo
+        extrepo enable dotnet
+        apt-get update
+    fi
+    apt-get install -y dotnet-sdk-8.0
 EOF
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -69,7 +75,7 @@ RUN <<EOF
     curl https://downloads.python.org/pypy/pypy3.11-v7.3.20-linux64.tar.bz2 -o /tmp/pypy.tar.bz2
     tar -xf /tmp/pypy.tar.bz2 -C /opt
     rm /tmp/pypy.tar.bz2
-    ln -s /opt/pypy3.11-v7.3.20-linux64 /opt/pypy3
+    mv /opt/pypy3.11-v7.3.20-linux64 /opt/pypy3
 EOF
 
 # Create cmsuser user with sudo privileges and access to isolate

@@ -25,6 +25,8 @@ import logging
 import os
 
 from cms.db import Executable
+from cms.db.filecacher import FileCacher
+from cms.grading.Job import EvaluationJob
 from cms.grading.ParameterTypes import ParameterTypeCollection, \
     ParameterTypeChoice, ParameterTypeString
 from cms.grading.language import Language
@@ -245,7 +247,7 @@ class Batch(TaskType):
 
         # Run the compilation.
         box_success, compilation_success, text, stats = \
-            compilation_step(sandbox, commands)
+            compilation_step(sandbox, commands, language)
 
         # Retrieve the compiled executables.
         job.success = box_success
@@ -269,7 +271,7 @@ class Batch(TaskType):
 
         self._do_compile(job, file_cacher)
 
-    def _execution_step(self, job, file_cacher):
+    def _execution_step(self, job: EvaluationJob, file_cacher: FileCacher):
         # Prepare the execution
         executable_filename = next(iter(job.executables.keys()))
         language = get_language(job.language)
@@ -284,18 +286,13 @@ class Batch(TaskType):
             self._actual_input: job.input
         }
 
-        # Check which redirect we need to perform, and in case we don't
-        # manage the output via redirect, the submission needs to be able
-        # to write on it.
-        files_allowing_write = []
+        # Check which redirect we need to perform
         stdin_redirect = None
         stdout_redirect = None
         if len(self.input_filename) == 0:
             stdin_redirect = self._actual_input
         if len(self.output_filename) == 0:
             stdout_redirect = self._actual_output
-        else:
-            files_allowing_write.append(self._actual_output)
 
         # Create the sandbox
         sandbox = create_sandbox(file_cacher, name="evaluate")
@@ -326,9 +323,9 @@ class Batch(TaskType):
         box_success, evaluation_success, stats = evaluation_step(
             sandbox,
             commands,
+            language,
             job.effective_time_limit(),
             job.memory_limit,
-            writable_files=files_allowing_write,
             stdin_redirect=stdin_redirect,
             stdout_redirect=stdout_redirect,
             multiprocess=enable_multiprocess)

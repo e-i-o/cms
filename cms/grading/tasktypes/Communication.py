@@ -227,7 +227,7 @@ class Communication(TaskType):
 
         # Run the compilation.
         box_success, compilation_success, text, stats = \
-            compilation_step(sandbox, commands)
+            compilation_step(sandbox, commands, language)
 
         # Retrieve the compiled executables.
         job.success = box_success
@@ -322,10 +322,10 @@ class Communication(TaskType):
         manager_ = evaluation_step_before_run(
             sandbox_mgr,
             manager_command,
+            None,
             manager_time_limit,
             config.sandbox.trusted_sandbox_max_memory_kib * 1024,
             dirs_map=dict((fifo_dir[i], (sandbox_fifo_dir[i], "rw")) for i in indices),
-            writable_files=[self.OUTPUT_FILENAME],
             stdin_redirect=self.INPUT_FILENAME,
             multiprocess=job.multithreaded_sandbox,
         )
@@ -357,11 +357,13 @@ class Communication(TaskType):
             # Assumes that the actual execution of the user solution is the
             # last command in commands, and that the previous are "setup"
             # that don't need tight control.
+            # TODO: why can't this use normal evaluation step??
             if len(commands) > 1:
                 trusted_step(sandbox_user[i], commands[:-1])
             the_process = evaluation_step_before_run(
                 sandbox_user[i],
                 commands[-1],
+                language,
                 user_time_limit,
                 job.memory_limit,
                 dirs_map={fifo_dir[i]: (sandbox_fifo_dir[i], "rw")},
@@ -439,6 +441,6 @@ class Communication(TaskType):
         delete_sandbox(sandbox_mgr, job)
         for s in sandbox_user:
             delete_sandbox(s, job)
-        if job.success and not config.worker.keep_sandbox and not job.keep_sandbox:
+        if job.success:
             for d in fifo_dir:
                 rmtree(d)
