@@ -132,11 +132,11 @@ def load(src, dst, src_name, dst_name=None, conv=lambda i: i):
 
 def parse_datetime(val):
     if isinstance(val, datetime):
-        return val.astimezone(timezone.utc)
+        return val.astimezone(timezone.utc).replace(tzinfo=None)
     if isinstance(val, (int, float)):
-        return datetime.fromtimestamp(val, timezone.utc)
+        return datetime.fromtimestamp(val, timezone.utc).replace(tzinfo=None)
     if isinstance(val, str):
-        return datetime.fromisoformat(val).astimezone(timezone.utc)
+        return datetime.fromisoformat(val).astimezone(timezone.utc).replace(tzinfo=None)
     raise ValueError("Invalid datetime format.")
 
 
