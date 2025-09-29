@@ -39,6 +39,7 @@ class ScoreTypeTestMixin:
         sr.evaluations = [
             ScoreTypeTestMixin.get_evaluation(codename, 1.0)
             for codename in reversed(sorted(testcases.keys()))]
+        sr.submission.language = 'Python 3 / CPython' # HACK: needs to be a real language...
         sr.submission.task.score_precision = 4
         sr.dataset.relative_scoring = False
         return sr
