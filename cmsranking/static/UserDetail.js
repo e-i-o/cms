@@ -142,6 +142,7 @@ var UserDetail = new function () {
         }
         for (var i = 0; i < data.length; i += 1) {
             var submission = data[i];
+            if(self.submissions[submission['task']] === undefined) continue;
             self.submissions[submission['task']].push(submission);
         }
 
