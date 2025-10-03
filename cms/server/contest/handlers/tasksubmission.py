@@ -266,7 +266,7 @@ class SubmissionStatusHandler(ContestHandler):
             self.add_task_score(submission.participation, task, data)
 
             score_type = task.active_dataset.score_type_object
-            if score_type.max_public_score > 0:
+            if True: # cws reads these fields unconditionally, might aswell write them unconditionally
                 data["max_public_score"] = score_type.max_public_score
                 if data["status"] == SubmissionResult.SCORED:
                     data["public_score"] = sr.public_score
@@ -274,6 +274,9 @@ class SubmissionStatusHandler(ContestHandler):
                         sr.public_score, score_type.max_public_score,
                         sr.public_score_details,
                         translation=self.translation)
+                    data["public_score_class"] = score_type.get_score_class(
+                        sr.public_score, score_type.max_public_score,
+                        sr.public_score_details)
             if score_type.max_public_score < score_type.max_score:
                 data["max_score"] = score_type.max_score
                 if data["status"] == SubmissionResult.SCORED \
@@ -284,6 +287,9 @@ class SubmissionStatusHandler(ContestHandler):
                         sr.score, score_type.max_score,
                         sr.score_details,
                         translation=self.translation)
+                    data["score_class"] = score_type.get_score_class(
+                        sr.score, score_type.max_score,
+                        sr.score_details)
 
         self.write(data)
 

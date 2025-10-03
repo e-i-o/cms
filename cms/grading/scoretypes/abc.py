@@ -140,6 +140,19 @@ class ScoreType(metaclass=ABCMeta):
         """
         return score_details
 
+    @staticmethod
+    def get_score_class(
+        score: float,
+        max_score: float,
+        score_details: object,
+    ) -> str:
+        if score <= 0:
+            return "score_0"
+        elif score >= max_score:
+            return "score_100"
+        else:
+            return "score_0_100"
+
     def get_html_details(
         self,
         score_details: object,
@@ -735,3 +748,23 @@ class ScoreTypeGroup(ScoreTypeAlone):
 
         """
         pass
+
+    @staticmethod
+    def get_score_class(
+        score: float,
+        max_score: float,
+        score_details: object,
+    ) -> str:
+        if max_score > 0:
+            return ScoreType.get_score_class(score, max_score, score_details)
+        else:
+            # For 0-point tasks, we need to manually compute whether it's
+            # correct or not, as the base case will only see "0 / 0"
+            min_score_frac = min(x["score_fraction"] for x in score_details)
+            max_score_frac = max(x["score_fraction"] for x in score_details)
+            if max_score_frac <= 0:
+                return "score_0"
+            elif min_score_frac >= 1:
+                return "score_100"
+            else:
+                return "score_0_100"
