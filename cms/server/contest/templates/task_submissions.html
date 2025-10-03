@@ -93,12 +93,12 @@ function get_score_class (score, max_score) {
  * max_score (Number): maximum score of the task.
  */
 update_score = function(score_elem, task_score_elem,
-        score, score_message,
+        score, score_message, score_class,
         task_score, task_score_message, task_score_is_partial,
         max_score) {
     // Submission row.
     if (score !== undefined) {
-        score_elem.addClass(get_score_class(score, max_score));
+        score_elem.addClass(score_class);
         score_elem.removeClass("undefined");
         score_elem.text(score_message);
     }
@@ -132,13 +132,13 @@ update_scores = function (submission_id, data) {
     if (terminal_status) {
         update_score(
             row.children("td.public_score"), $("#task_score_public"),
-            data["public_score"], data["public_score_message"],
+            data["public_score"], data["public_score_message"], data["public_score_class"],
             data["task_public_score"], data["task_public_score_message"],
             data["task_score_is_partial"], data["max_public_score"]);
 {% if can_use_tokens %}
         update_score(
             row.children("td.total_score"), $("#task_score_tokened"),
-            data["score"], data["score_message"],
+            data["score"], data["score_message"], data["score_class"],
             data["task_tokened_score"], data["task_tokened_score_message"],
             data["task_score_is_partial"], data["max_score"]);
 {% endif %}
