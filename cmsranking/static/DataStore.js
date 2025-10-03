@@ -276,6 +276,7 @@ var DataStore = new function () {
             // this task doesn't exist in this division
             return;
         }
+        if(data["max_score"] == 0) return;
 
         data["key"] = key;
         self.tasks[key] = data;
@@ -292,6 +293,7 @@ var DataStore = new function () {
         if (self.filtered_division !== null && data["groups"] !== null && data["groups"].split(" ").indexOf(self.filtered_division) == -1) {
             return;
         }
+        if(data["max_score"] == 0) return;
         var old_data = self.tasks[key];
 
         data["key"] = key;
