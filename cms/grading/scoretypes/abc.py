@@ -307,7 +307,12 @@ class ScoreTypeGroup(ScoreTypeAlone):
                 <tr class="partiallycorrect">
             {% endif %}
                     <td class="idx">{{ loop.index }}</td>
-                    <td class="outcome">{{ _(tc["outcome"]) }}</td>
+                    <td class="outcome">
+                      {{ _(tc["outcome"]) }}
+                      {% if "is_rel_score" in tc and tc["is_rel_score"] and tc["outcome_float"] > 0 %}
+                        {{ " ({:.2f}% of best)".format(tc["outcome_float"] * 100) }}
+                      {% endif %}
+                    </td>
                     <td class="details">
                       {{ tc["text"]|format_status_text }}
                       {% if tc["help"] is not none %}
@@ -451,10 +456,35 @@ class ScoreTypeGroup(ScoreTypeAlone):
 
             tc_first_lowest_idx = None
             tc_first_lowest_score = None
+            tc_scores: list[float] = []
+
             for tc_idx in target:
                 tc_score = float(evaluations[tc_idx].outcome)
+
+                # Implement relative scoring
+                if submission_result.dataset.relative_scoring:
+                    is_official = submission_result.submission.official
+                    tc = submission_result.dataset.testcases[tc_idx]
+                    safegt = lambda a,b: b is None or a > b
+                    # hackity hack hack :)
+                    # this will be committed to the DB by the ScoringService who called compute_score
+                    if safegt(tc_score, tc.best_unofficial_score):
+                        tc.best_unofficial_score = tc_score
+                        invalidate_dataset = True
+                    if is_official and safegt(tc_score, tc.best_official_score):
+                        tc.best_official_score = tc_score
+                        invalidate_dataset = True
+                    scaler = tc.best_official_score if is_official else tc.best_unofficial_score
+                    scaler = scaler or 1.0
+                    tc_score /= scaler
+
+                tc_scores.append(tc_score)
                 tc_outcome = self.get_public_outcome(
                     tc_score, parameter)
+                if submission_result.dataset.relative_scoring and tc_score > 0:
+                    # hack: for relative scoring "partially correct" isnt really meaningful,
+                    # so force it to be green
+                    tc_outcome = self.get_public_outcome(1.0, parameter)
 
                 time_limit_was_exceeded = False
                 if evaluations[tc_idx].text == [EVALUATION_MESSAGES.get("timeout").message]:
@@ -482,6 +512,8 @@ class ScoreTypeGroup(ScoreTypeAlone):
                 testcases.append({
                     "idx": tc_idx,
                     "outcome": tc_outcome,
+                    "outcome_float": tc_score,
+                    "is_rel_score": submission_result.dataset.relative_scoring,
                     "text": evaluations[tc_idx].text,
                     "help": helptext,
                     "time": evaluations[tc_idx].execution_time,
@@ -499,29 +531,6 @@ class ScoreTypeGroup(ScoreTypeAlone):
                         tc_first_lowest_score = tc_score
                 else:
                     public_testcases.append({"idx": tc_idx})
-
-            # Implement relative scoring
-            if submission_result.dataset.relative_scoring:
-                is_official = submission_result.submission.official
-                tc_scores = []
-                for tc_idx in target:
-                    tc_outcome = float(evaluations[tc_idx].outcome)
-                    tc = submission_result.dataset.testcases[tc_idx]
-                    safegt = lambda a,b: b is None or a > b
-                    # hackity hack hack :)
-                    # this will be committed to the DB by the ScoringService who called compute_score
-                    if safegt(tc_outcome, tc.best_unofficial_score):
-                        logger.info(f"new best on tc={tc_idx} outcome={tc_outcome} old={tc.best_unofficial_score}")
-                        tc.best_unofficial_score = tc_outcome
-                        invalidate_dataset = True
-                    if is_official and safegt(tc_outcome, tc.best_official_score):
-                        tc.best_official_score = tc_outcome
-                        invalidate_dataset = True
-                    scaler = tc.best_official_score if is_official else tc.best_unofficial_score
-                    scaler = scaler or 1.0
-                    tc_scores.append(tc_outcome / scaler)
-            else:
-                tc_scores = [float(evaluations[tc_idx].outcome) for tc_idx in target]
 
             st_score_fraction = self.reduce(
                 tc_scores,
