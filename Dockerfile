@@ -63,15 +63,24 @@ EOF
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked <<EOF
 #!/bin/bash -ex
-    export DEBIAN_FRONTEND=noninteractive
-    CODENAME=$(source /etc/os-release; echo $VERSION_CODENAME)
-    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/isolate.asc]" \
-        "http://www.ucw.cz/isolate/debian/ ${CODENAME}-isolate main" \
-        >/etc/apt/sources.list.d/isolate.list
-    curl https://www.ucw.cz/isolate/debian/signing-key.asc \
-        >/etc/apt/keyrings/isolate.asc
-    apt-get update
-    apt-get install -y isolate
+    #export DEBIAN_FRONTEND=noninteractive
+    #CODENAME=$(source /etc/os-release; echo $VERSION_CODENAME)
+    #echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/isolate.asc]" \
+    #    "http://www.ucw.cz/isolate/debian/ ${CODENAME}-isolate main" \
+    #    >/etc/apt/sources.list.d/isolate.list
+    #curl https://www.ucw.cz/isolate/debian/signing-key.asc \
+    #    >/etc/apt/keyrings/isolate.asc
+    #apt-get update
+    #apt-get install -y isolate
+    apt-get install -y libcap-dev libseccomp-dev libsystemd-dev
+    git clone https://github.com/ioi/isolate /tmp/isolate
+    cd /tmp/isolate
+    make install PREFIX=/usr VARPREFIX=/var CONFIGDIR=/etc SBINDIR=/usr/bin
+    addgroup --quiet --system isolate
+    adduser --quiet --disabled-login --ingroup isolate --home /nonexistent --no-create-home --shell /bin/false --comment "" isolate
+    chown root:isolate /usr/bin/isolate
+    chmod 4754 /usr/bin/isolate
+
     sed -i 's@^cg_root .*@cg_root = /sys/fs/cgroup@' /etc/isolate
 EOF
 
