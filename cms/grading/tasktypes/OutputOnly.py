@@ -23,8 +23,13 @@
 
 """
 
+import json
 import logging
+import os
+import subprocess
+import tempfile
 
+from cms import config
 from cms.grading.Job import Job
 from cms.grading.ParameterTypes import ParameterTypeChoice
 from . import TaskType, eval_output
@@ -57,6 +62,7 @@ class OutputOnly(TaskType):
     # Constants used in the parameter definition.
     OUTPUT_EVAL_DIFF = "diff"
     OUTPUT_EVAL_CHECKER = "comparator"
+    OUTPUT_EVAL_TRUSTED_CHECKER = "trusted_checker"
 
     # Other constants to specify the task type behaviour and parameters.
     ALLOW_PARTIAL_SUBMISSION = True
@@ -66,7 +72,8 @@ class OutputOnly(TaskType):
         "output_eval",
         "",
         {OUTPUT_EVAL_DIFF: "Outputs compared with white diff",
-         OUTPUT_EVAL_CHECKER: "Outputs are compared by a comparator"})
+         OUTPUT_EVAL_CHECKER: "Outputs are compared by a comparator",
+         OUTPUT_EVAL_TRUSTED_CHECKER: "Outputs are compared by trusted checker"})
 
     ACCEPTED_PARAMETERS = [_EVALUATION]
 
@@ -121,6 +128,38 @@ class OutputOnly(TaskType):
             job.outcome = "0.0"
             job.text = [N_("File not submitted")]
             job.plus = {}
+            return
+
+        if self.output_eval == OutputOnly.OUTPUT_EVAL_TRUSTED_CHECKER:
+            with tempfile.TemporaryDirectory(dir=config.global_.temp_dir, prefix="cms-trusted-check-") as tmp:
+                file_cacher.get_file_to_path(job.input, tmp + "/input")
+                file_cacher.get_file_to_path(job.output, tmp + "/output")
+                file_cacher.get_file_to_path(job.files[user_output_filename].digest, tmp + "/user_out")
+                file_cacher.get_file_to_path(job.managers[OutputOnly.CHECKER_CODENAME].digest, tmp + "/checker")
+                os.chmod(tmp + "/checker", 0o775)
+                box_id_start = (file_cacher.service.shard + 1) * 1000
+                try:
+                    p = subprocess.run(
+                        ["./checker", str(box_id_start)],
+                        cwd=tmp,
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.PIPE,
+                        check=True,
+                        timeout=60,
+                    )
+                    stdout_str = p.stdout.decode("utf-8")
+                    result = json.loads(stdout_str)
+                except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError):
+                    logger.error("trusted checker failed", exc_info=True)
+                    job.success = False
+                    job.text = ["internal error in checker"]
+                    return
+
+            job.success = result["success"]
+            job.outcome = str(result["outcome"])
+            job.text = result["text"]
+            job.admin_text = result.get("admin_text")
+            job.plus = result.get("stats", {})
             return
 
         # First and only step: eval the user output.

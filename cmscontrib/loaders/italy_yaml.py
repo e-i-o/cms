@@ -976,6 +976,8 @@ class YamlLoader(ContestLoader, TaskLoader, UserLoader, TeamLoader):
             args["time_limit"] = None
             args["time_limit_interpreted"] = None
             args["memory_limit"] = None
+            if conf.get('use_trusted_checker', False):
+                evaluation_param = 'trusted_checker'
             args["task_type_parameters"] = [evaluation_param]
             task.submission_format = ["output_%03d.txt" % i for i in range(n_input)]
 
