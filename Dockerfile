@@ -102,7 +102,8 @@ RUN --mount=type=cache,target=/home/cmsuser/.cache/pip,uid=2000 ./install.py cms
 
 RUN <<EOF
 #!/bin/bash -ex
-    sed 's|/cmsuser:your_password_here@localhost:5432/cmsdb"|/postgres@testdb:5432/cmsdbfortesting"|' \
+    sed -e 's|/cmsuser:your_password_here@localhost:5432/cmsdb"|/postgres@testdb:5432/cmsdbfortesting"|' \
+        -e '/^compilation_sandbox_max_time_s = /s/ = 10.0/ = 15.0/' \
         ./config/cms.sample.toml >../cms/etc/cms-testdb.toml
     sed -e 's|/cmsuser:your_password_here@localhost:5432/cmsdb"|/postgres@devdb:5432/cmsdb"|' \
         -e 's/127.0.0.1/0.0.0.0/' \
