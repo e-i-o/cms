@@ -433,6 +433,8 @@ class ScoreTypeGroup(ScoreTypeAlone):
                     filtered_tc = {
                         "idx": tc["idx"],
                         "outcome": tc["outcome"],
+                        "outcome_float": tc["outcome_float"],
+                        "is_rel_score": tc["is_rel_score"],
                         "text": tc.get("text"),
                         "help": tc["help"],
                     }
