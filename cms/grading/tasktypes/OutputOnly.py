@@ -144,13 +144,16 @@ class OutputOnly(TaskType):
                         cwd=tmp,
                         stdin=subprocess.DEVNULL,
                         stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
                         check=True,
                         timeout=60,
                     )
                     stdout_str = p.stdout.decode("utf-8")
                     result = json.loads(stdout_str)
-                except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError):
+                except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError) as e:
                     logger.error("trusted checker failed", exc_info=True)
+                    if isinstance(e, subprocess.CalledProcessError):
+                        logger.error("trusted stderr: %r", e.stderr)
                     job.success = False
                     job.text = ["internal error in checker"]
                     return
